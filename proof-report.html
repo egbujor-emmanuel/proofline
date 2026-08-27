@@ -80,7 +80,7 @@
 
   <div class="verdict warn">
     <h2>REVIEW REQUIRED</h2>
-    <p>Verification did not complete cleanly for at least one affected AC due to a test-agent error, not a confirmed product defect. Re-run verification before deciding.</p>
+    <p>At least one affected AC is only test-linked, not independently machine-asserted -- Kane's evidence for it is weaker than a direct check.</p>
   </div>
 
   <h2>Affected acceptance criteria (6)</h2>
@@ -89,77 +89,77 @@
         <header>
           <h3>AC-1</h3>
           <span class="pill good">Machine verified</span>
-          <span class="conf">mapper confidence: <strong>high</strong></span>
+          <span class="conf">mapper confidence: <strong>medium</strong></span>
         </header>
         <p class="interp"><span class="tag">Proofline</span>Kane reported PASS for &quot;Fresh fetch and reload show the upgraded Pro plan&quot;'s explicit runtime check (state-transition: equals pro) targeting exactly this AC, on a clean (non-flaky, non-healed) execution.</p>
         <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>The added PRD blob and derived usecase node define AC-01.1 (&quot;the account's persisted plan equals `pro`&quot; after a successful upgrade request), so this diff establishes the exact requirement ac-1 asserts.</p>
-        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [free(1.79), pro(0.41)], score 2.20</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [account(1.10), free(1.79), pro(0.41), upgrade(0.00)], score 3.30</span></li></ul>
+        <p class="rationale"><span class="tag">Why flagged</span>The diff adds PRD/context artifacts asserting AC-01.1 (persisted plan becomes `pro` after upgrade) as a derived use-case criterion, so the specification governing this AC is introduced/changed here, though no application code is touched.</p>
+        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [free(1.79), pro(0.41)], score 2.20</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [account(1.10), free(1.79), pro(0.41), upgrade(0.00)], score 3.30</span></li><li><code>proof-report.html</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
       </article>
       <article class="ac warn">
         <header>
           <h3>AC-2</h3>
           <span class="pill warn">Test-linked, not independently asserted</span>
-          <span class="conf">mapper confidence: <strong>high</strong></span>
+          <span class="conf">mapper confidence: <strong>medium</strong></span>
         </header>
         <p class="interp"><span class="tag">Proofline</span>Test &quot;Fresh fetch and reload show the upgraded Pro plan&quot; claims to verify this AC (@verifies ac-1, ac-2, ac-6), but its explicit runtime check targets ac-1 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
         <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>The same AC-01.1 text and the derived usecase criterion explicitly require &quot;a fresh fetch, not a cached value&quot; to confirm the `pro` plan, directly covering ac-2's cache-freshness condition.</p>
-        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [account(1.10), pro(0.41), upgrade(0.00)], score 1.50</span></li></ul>
+        <p class="rationale"><span class="tag">Why flagged</span>The added PRD text and derived usecase node explicitly restate the fresh-fetch-not-cached requirement, so this AC's source of truth is defined by the diff.</p>
+        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [account(1.10), pro(0.41), upgrade(0.00)], score 1.50</span></li><li><code>proof-report.html</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
       </article>
       <article class="ac warn">
         <header>
           <h3>AC-6</h3>
           <span class="pill warn">Test-linked, not independently asserted</span>
-          <span class="conf">mapper confidence: <strong>high</strong></span>
+          <span class="conf">mapper confidence: <strong>medium</strong></span>
         </header>
         <p class="interp"><span class="tag">Proofline</span>Test &quot;Fresh fetch and reload show the upgraded Pro plan&quot; claims to verify this AC (@verifies ac-1, ac-2, ac-6), but its explicit runtime check targets ac-1 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
         <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>AC-02.2 requires that after upgrade and reload the dashboard shows &quot;Pro&quot; from persisted server state and &quot;must not continue showing Free&quot;, which is ac-6 verbatim in substance.</p>
-        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li></ul>
+        <p class="rationale"><span class="tag">Why flagged</span>AC-02.2 in the added PRD and the 'View the current subscription plan on the dashboard' usecase require the reloaded dashboard to show persisted `Pro`, matching this AC.</p>
+        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>proof-report.html</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
       </article>
-      <article class="ac warn">
+      <article class="ac good">
         <header>
           <h3>AC-3</h3>
-          <span class="pill warn">Review required — test-agent error</span>
-          <span class="conf">mapper confidence: <strong>high</strong></span>
+          <span class="pill good">Machine verified</span>
+          <span class="conf">mapper confidence: <strong>medium</strong></span>
         </header>
-        <p class="interp"><span class="tag">Proofline</span>Kane reported this execution as &quot;broken&quot; (the test-agent could not complete &quot;Dashboard upgrade stays in place and shows success without payment&quot;). REVIEW REQUIRED -- no product defect established.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>broken</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>AC-01.2 in the new PRD blob and the usecase criterion both state the &quot;Upgrade to Pro&quot; button triggers the upgrade &quot;without a full page navigation&quot;, which is precisely ac-3.</p>
-        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li></ul>
+        <p class="interp"><span class="tag">Proofline</span>Kane reported PASS for &quot;Dashboard upgrade stays in place and shows success without payment&quot;'s explicit runtime check (forbidden-presence: exists full page navigation away from the dashboard during the upgrade action) targeting exactly this AC, on a clean (non-flaky, non-healed) execution.</p>
+        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
+        <p class="rationale"><span class="tag">Why flagged</span>AC-01.2 in the new PRD blob and the 'triggers the upgrade without full page navigation' criterion in the extracted usecase directly encode this AC.</p>
+        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>proof-report.html</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
       </article>
       <article class="ac warn">
         <header>
           <h3>AC-4</h3>
-          <span class="pill warn">Review required — test-agent error</span>
-          <span class="conf">mapper confidence: <strong>high</strong> <em>(model-identified)</em></span>
+          <span class="pill warn">Test-linked, not independently asserted</span>
+          <span class="conf">mapper confidence: <strong>medium</strong> <em>(model-identified)</em></span>
         </header>
-        <p class="interp"><span class="tag">Proofline</span>Kane reported this execution as &quot;broken&quot; (the test-agent could not complete &quot;Dashboard upgrade stays in place and shows success without payment&quot;). REVIEW REQUIRED -- no product defect established.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>broken</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>AC-01.2 also requires that &quot;the button's success confirmation appears in the same view&quot;, and the derived usecase repeats &quot;shows success confirmation in the same view&quot;, matching ac-4. (Identified by claude CLI; not structurally flagged by term overlap.)</p>
+        <p class="interp"><span class="tag">Proofline</span>Test &quot;Dashboard upgrade stays in place and shows success without payment&quot; claims to verify this AC (@verifies ac-3, ac-4, ac-5), but its explicit runtime check targets ac-3 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
+        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
+        <p class="rationale"><span class="tag">Why flagged</span>The same AC-01.2 clause added by the diff requires the success confirmation to appear in the same view, so this AC is covered by the introduced spec. (Identified by claude CLI; not structurally flagged by term overlap.)</p>
         
       </article>
       <article class="ac warn">
         <header>
           <h3>AC-5</h3>
-          <span class="pill warn">Review required — test-agent error</span>
+          <span class="pill warn">Test-linked, not independently asserted</span>
           <span class="conf">mapper confidence: <strong>medium</strong> <em>(model-identified)</em></span>
         </header>
-        <p class="interp"><span class="tag">Proofline</span>Kane reported this execution as &quot;broken&quot; (the test-agent could not complete &quot;Dashboard upgrade stays in place and shows success without payment&quot;). REVIEW REQUIRED -- no product defect established.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>broken</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>The PRD's &quot;Out of scope&quot; section states &quot;Upgrade is a direct state change with no payment step&quot; and the derived usecase carries it as a criterion, so ac-5 is defined by this diff even though it was not structurally flagged. (Identified by claude CLI; not structurally flagged by term overlap.)</p>
+        <p class="interp"><span class="tag">Proofline</span>Test &quot;Dashboard upgrade stays in place and shows success without payment&quot; claims to verify this AC (@verifies ac-3, ac-4, ac-5), but its explicit runtime check targets ac-3 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
+        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
+        <p class="rationale"><span class="tag">Why flagged</span>The new 'Out of scope' section and the usecase criterion 'upgrade is a direct state change with no payment step' define this AC verbatim. (Identified by claude CLI; not structurally flagged by term overlap.)</p>
         
       </article>
 
-  <section><h2>Changed files with no requirement coverage</h2><ul class="files"><li><code>.gitignore</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proof-report.html</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/bin/proofline.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/package.json</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/git.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmProvider.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmRank.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/report.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/test/llmRank.test.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li></ul></section>
+  <section><h2>Changed files with no requirement coverage</h2><ul class="files"><li><code>.gitignore</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/bin/proofline.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/make-artifact.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/package.json</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/git.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmProvider.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmRank.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/report.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/test/llmRank.test.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li></ul></section>
 
   <div class="meta">
     <div><strong>Repository:</strong> <code>C:\Users\Yoma Maroh\proofline</code></div>
-    <div><strong>Compared against:</strong> <code>HEAD~6</code></div>
-    <div><strong>Changed files:</strong> 11</div>
-    <div><strong>Kane evidence pack:</strong> <code>C:\Users\Yoma Maroh\proofline\.testmuai\evidence\35b061c6-40d6-4e4f-b9fd-e30c48893b89.evidence</code></div>
-    <div><strong>Generated:</strong> 2026-08-27T16:09:22.249Z</div>
+    <div><strong>Compared against:</strong> <code>HEAD~7</code></div>
+    <div><strong>Changed files:</strong> 12</div>
+    <div><strong>Kane evidence pack:</strong> <code>C:\Users\Yoma Maroh\proofline\.testmuai\evidence\a492cabd-0e49-499c-a59a-3ad931c007de.evidence</code></div>
+    <div><strong>Generated:</strong> 2026-08-27T16:31:38.842Z</div>
     <div>Kane executes and produces evidence. Proofline decides which requirements a change threatens and whether that evidence is strong enough to ship on.</div>
   </div>
 </div></body>

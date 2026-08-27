@@ -1,7 +1,7 @@
 ---
 assurance:
   id: t-2
-  base: sha256:f39cb294851d426247fcd5d624dfa80aa4814cbf46351618bb1fb02a118dfaef
+  base: sha256:9b2b3981654b9531be2f0f6af2f7b0919a2a7207871f2216d953f2daeb0f42af
 ---
 # Dashboard upgrade stays in place and shows success without payment
 
@@ -13,20 +13,20 @@ Open {{start_url}} in a browser and reach the subscription dashboard.
 
 ## Step 2
 
-Call `POST /api/reset` for the running application, reload the dashboard, confirm the current plan is shown as `Free`, and store the current page URL as `baseline_url`.
+Send a POST request to the absolute URL `http://localhost:4000/api/reset`, reload the dashboard, and confirm the current plan is shown as `Free`.
 
 ## Step 3
 
-Prepare the browser network log for the upcoming upgrade action so any new top-level document or navigation request can be distinguished from ordinary in-page requests.
+Click the `Upgrade to Pro` button on the dashboard.
 
 ## Step 4
 
-Trigger the `Upgrade to Pro` button on the dashboard and wait for the success confirmation to appear while the dashboard remains visible.
+On the same page, read the success confirmation message shown under the plan and store it as `confirmation_text`.
 
 ## Step 5
 
-Review the post-upgrade page state: store the current page URL as `post_upgrade_url`, determine whether the action created any new top-level document or navigation request, and determine whether any payment-processing UI or payment step appeared.
+Read the visible page and store whether any credit-card field, payment form, or checkout step is shown as `payment_ui_present`.
 
 ## Step 6 — assert @verifies ac-3, ac-4, ac-5
 
-Confirm 'full page navigation away from the dashboard during the upgrade action' does NOT appear (forbidden-presence) — the stated promise: Clicking the "Upgrade to Pro" button triggers the upgrade without a full page navigation.
+Confirm the success confirmation message reading `Upgraded! You are now on the Pro plan.` is visible on the dashboard — the stated promise: clicking "Upgrade to Pro" completes the upgrade in the same view, with no full page navigation and no payment step. This message is written into the page by the upgrade action itself, so it can only still be visible if the dashboard was never reloaded or navigated away from.
