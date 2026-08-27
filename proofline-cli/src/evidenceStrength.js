@@ -1,13 +1,17 @@
+const path = require('path');
 const { allTests } = require('./verifiesParser');
 const { listNodes, getTestByTitle } = require('./contextGraph');
 const { coverForPack } = require('./coverage');
+const { findResultStatus } = require('./evidencePack');
 
 const STATES = {
   MACHINE_VERIFIED: 'machine_verified',
   TEST_LINKED_ONLY: 'test_linked_only',
   NOT_VERIFIED: 'not_verified',
   UNAFFECTED: 'unaffected',
-  EXECUTION_ERROR: 'execution_error',
+  PRODUCT_BUG: 'product_bug',
+  AGENT_MISSTEP: 'agent_misstep',
+  TEST_FAILURE_UNCLASSIFIED: 'test_failure_unclassified',
 };
 
 /**
@@ -22,10 +26,14 @@ const STATES = {
  *    vs lenient rollup does not distinguish this; ac-1/ac-2/ac-6 all show
  *    identical proven counts under both).
  *  - not_verified: no live test verifies this AC at all.
- *  - execution_error: the covering test's run did not pass (agent misstep or
- *    product bug -- this module does not itself distinguish those; that
- *    requires the run's own bug-detection verdict, captured live by whatever
- *    invoked the targeted testrun).
+ *  - product_bug: the covering test completed and its assertion genuinely
+ *    failed against the real application -- a confirmed product defect.
+ *  - agent_misstep: the covering test's run did not complete (Kane's own
+ *    evidence pack marks it "broken", not "failed") -- the test-agent
+ *    couldn't act, which is NOT evidence the product is broken.
+ *  - test_failure_unclassified: the test didn't pass and the pack's status
+ *    doesn't cleanly resolve to either of the above -- treated as needing
+ *    human review rather than an automatic BLOCK.
  */
 function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {}) {
   const nodes = listNodes(repoRoot);
@@ -62,15 +70,37 @@ function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {})
     // only by a passing test) for a different, unrelated test's failure in
     // the same use-case. Confirmed necessary by a real run: t-1 passed,
     // t-2 failed, both roll up into the same use-case in `cover` output.
-    const fileBasename = require('path').basename(verifyingTest.filePath);
+    const fileBasename = path.basename(verifyingTest.filePath);
     const testPassed = memberStatus[fileBasename] === 'passed';
 
     if (!testPassed) {
-      results[acId] = {
-        state: STATES.EXECUTION_ERROR,
-        reason: `Covering test "${verifyingTest.title}" (${fileBasename}) did not pass in this run (status: ${memberStatus[fileBasename] || 'unknown'}). This module does not itself distinguish agent-misstep from product-bug -- check the run's own bug-detection verdict for that.`,
-        test: verifyingTest.title,
-      };
+      // Real signal, confirmed by direct inspection of a sealed evidence
+      // pack: result.yaml's own `status` field distinguishes "broken" (the
+      // agent got stuck / couldn't act -- Kane's own nested run_summary
+      // showed "AP determined agent is stuck, no viable actions remain")
+      // from a genuine completed-but-failed assertion. Never flatten these:
+      // an agent misstep is not evidence the product is broken.
+      const packStatus = findResultStatus(evidencePackPath, verifyingTest.filePath);
+
+      if (packStatus === 'broken') {
+        results[acId] = {
+          state: STATES.AGENT_MISSTEP,
+          reason: `REVIEW REQUIRED -- Verification failed due to test-agent error (Kane could not complete "${verifyingTest.title}"). No product defect established.`,
+          test: verifyingTest.title,
+        };
+      } else if (packStatus === 'failed') {
+        results[acId] = {
+          state: STATES.PRODUCT_BUG,
+          reason: `Test "${verifyingTest.title}" completed and its assertion failed against the real running application. This is a genuine product-behavior failure, not a test/agent error.`,
+          test: verifyingTest.title,
+        };
+      } else {
+        results[acId] = {
+          state: STATES.TEST_FAILURE_UNCLASSIFIED,
+          reason: `Covering test "${verifyingTest.title}" did not pass (member status: ${memberStatus[fileBasename] || 'unknown'}, pack status: ${packStatus || 'unreadable'}), and this run's evidence pack does not clearly classify it as agent-misstep or product-bug. Treat as needing human review, not an automatic BLOCK.`,
+          test: verifyingTest.title,
+        };
+      }
       continue;
     }
 
