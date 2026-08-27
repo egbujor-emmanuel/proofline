@@ -40,4 +40,15 @@ function getTestByTitle(repoRoot, nodes, title) {
   return { ...entry, ...readNode(repoRoot, entry.cid).content };
 }
 
-module.exports = { listNodes, readNode, getAc, getTestByTitle };
+/**
+ * Every live AC currently in the graph, fully resolved (text/kind/risk).
+ * Used by the structural mapper so it never needs a per-project, hand-
+ * maintained file->AC table -- it reasons over whatever ACs actually exist
+ * for THIS project's own ingested requirements.
+ */
+function listAcs(repoRoot) {
+  const nodes = listNodes(repoRoot);
+  return nodes.filter((n) => n.label === 'ac').map((n) => getAc(repoRoot, nodes, n.id));
+}
+
+module.exports = { listNodes, readNode, getAc, getTestByTitle, listAcs };

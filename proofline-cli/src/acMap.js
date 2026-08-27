@@ -1,45 +1,114 @@
 const fs = require('fs');
 const path = require('path');
-
-function loadRules() {
-  const raw = fs.readFileSync(path.join(__dirname, '..', 'config', 'ac-map.json'), 'utf-8');
-  return JSON.parse(raw).rules;
-}
+const { listAcs } = require('./contextGraph');
 
 /**
- * Deterministic candidate narrowing: changed file paths -> candidate ACs.
- * No LLM involved. Every candidate carries the exact rule that produced it,
- * so the mapping is inspectable rather than a black box.
+ * Deterministic candidate narrowing: changed file -> real structural
+ * signals extracted from the file itself, with NO per-project answer key.
+ * This replaced an earlier hand-authored config/ac-map.json that hardcoded
+ * "this file affects these ACs" per file -- that was flagged as undermining
+ * the product's own promise (give Proofline a real repo and it determines
+ * what's at risk, not "tell Proofline first"). The mechanism below is the
+ * same regardless of which project it's pointed at; only the live AC corpus
+ * it reasons over (from that project's own Kane context graph) differs.
+ *
+ * Signals extracted per file:
+ *  - filename tokens (e.g. "upgrade.js" -> "upgrade")
+ *  - HTTP route registrations (router.get('/path', ...)) -> method + path
+ *    segments
+ *  - require/import targets -> their basename tokens
+ *  - declared/exported function and const names, split on camelCase
+ *
+ * These are matched against a simple lowercase-word tokenization of each
+ * live AC's actual text. Any non-empty overlap makes that AC a candidate,
+ * with the exact overlapping terms recorded so the mapping stays
+ * inspectable rather than a black box.
  */
-function mapChangedFilesToCandidates(changedFiles) {
-  const rules = loadRules();
-  const byPath = new Map(rules.map((r) => [r.path, r]));
+function extractSignals(fileContent, filePath) {
+  const signals = new Set();
 
-  const candidates = new Map(); // ac -> { ac, confidence, files: [{path, reason}] }
-  const uncoveredFiles = [];
+  for (const tok of path.basename(filePath).replace(/\.[jt]sx?$/, '').split(/[-_/]+/)) {
+    if (tok.length > 2) signals.add(tok.toLowerCase());
+  }
 
-  for (const file of changedFiles) {
-    const rule = byPath.get(file);
-    if (!rule) {
-      uncoveredFiles.push({ path: file, reason: 'no entry in ac-map.json for this file' });
-      continue;
-    }
-    if (rule.acs.length === 0) {
-      uncoveredFiles.push({ path: file, reason: rule.reason });
-      continue;
-    }
-    for (const ac of rule.acs) {
-      if (!candidates.has(ac)) {
-        candidates.set(ac, { ac, confidence: 'rule-based', files: [] });
-      }
-      candidates.get(ac).files.push({ path: file, reason: rule.reason });
+  if (!fileContent) return [...signals];
+
+  const routeRe = /\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]*)['"`]/g;
+  let m;
+  while ((m = routeRe.exec(fileContent))) {
+    signals.add(m[1].toLowerCase());
+    for (const seg of m[2].split('/')) {
+      if (seg && !seg.startsWith(':')) signals.add(seg.toLowerCase());
     }
   }
 
-  return {
-    candidates: [...candidates.values()],
-    uncoveredFiles,
-  };
+  const reqRe = /require\(\s*['"`]([^'"`]+)['"`]\s*\)|from\s+['"`]([^'"`]+)['"`]/g;
+  while ((m = reqRe.exec(fileContent))) {
+    const target = m[1] || m[2];
+    for (const tok of path.basename(target).split(/[-_./]+/)) {
+      if (tok.length > 2) signals.add(tok.toLowerCase());
+    }
+  }
+
+  const fnRe = /function\s+(\w+)|const\s+(\w+)\s*=\s*(?:async\s*)?\(|exports\.(\w+)\s*=/g;
+  while ((m = fnRe.exec(fileContent))) {
+    const name = m[1] || m[2] || m[3];
+    if (!name) continue;
+    for (const tok of name.split(/(?=[A-Z])|_/)) {
+      if (tok.length > 2) signals.add(tok.toLowerCase());
+    }
+  }
+
+  return [...signals];
 }
 
-module.exports = { mapChangedFilesToCandidates };
+function tokenizeAcText(text) {
+  return new Set((text.toLowerCase().match(/[a-z]{3,}/g) || []));
+}
+
+function mapChangedFilesToCandidates(changedFiles, repoRoot) {
+  const acs = listAcs(repoRoot);
+  const candidates = new Map();
+  const uncoveredFiles = [];
+
+  for (const file of changedFiles) {
+    let content = null;
+    try {
+      content = fs.readFileSync(path.join(repoRoot, file), 'utf-8');
+    } catch {
+      // deleted, binary, or otherwise unreadable -- signals fall back to
+      // filename tokens only, computed inside extractSignals(null, file).
+    }
+
+    const signals = extractSignals(content, file);
+    let matchedAny = false;
+
+    for (const ac of acs) {
+      const acTokens = tokenizeAcText(ac.text || '');
+      const overlap = signals.filter((s) => acTokens.has(s));
+      if (overlap.length === 0) continue;
+
+      matchedAny = true;
+      if (!candidates.has(ac.id)) {
+        candidates.set(ac.id, { ac: ac.id, confidence: 'rule-based', files: [] });
+      }
+      candidates.get(ac.id).files.push({
+        path: file,
+        reason: `structural term overlap: [${overlap.join(', ')}]`,
+      });
+    }
+
+    if (!matchedAny) {
+      uncoveredFiles.push({
+        path: file,
+        reason: acs.length === 0
+          ? 'no ACs exist yet in this project\'s Kane context graph'
+          : 'no structural term overlap between this file\'s extracted signals and any live AC text',
+      });
+    }
+  }
+
+  return { candidates: [...candidates.values()], uncoveredFiles, allAcs: acs };
+}
+
+module.exports = { mapChangedFilesToCandidates, extractSignals, tokenizeAcText };

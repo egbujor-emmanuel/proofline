@@ -3,7 +3,6 @@ const path = require('path');
 const { changedFiles, diffText } = require('../src/git');
 const { mapChangedFilesToCandidates } = require('../src/acMap');
 const { refineCandidates } = require('../src/llmRank');
-const { listNodes, getAc } = require('../src/contextGraph');
 const { resolveTestFilesForAcs, runTargeted } = require('../src/kane');
 const { classify } = require('../src/evidenceStrength');
 const { render } = require('../src/verdict');
@@ -22,21 +21,14 @@ async function main() {
     return;
   }
 
-  const { candidates, uncoveredFiles } = mapChangedFilesToCandidates(files);
+  const { candidates, uncoveredFiles, allAcs } = mapChangedFilesToCandidates(files, REPO_ROOT);
 
   if (candidates.length === 0) {
     console.log(render({ changedFiles: files, uncoveredFiles, candidates: [], evidenceByAc: {} }).text);
     return;
   }
 
-  const nodes = listNodes(REPO_ROOT);
-  const acTexts = {};
-  for (const c of candidates) {
-    const ac = getAc(REPO_ROOT, nodes, c.ac);
-    acTexts[c.ac] = ac ? ac.text : '';
-  }
-
-  const refined = await refineCandidates(diffText(REPO_ROOT, ref), candidates, acTexts);
+  const refined = await refineCandidates(diffText(REPO_ROOT, ref), candidates, allAcs);
 
   if (dryRun) {
     console.log('DRY RUN -- mapping only, no Kane verification executed (no credits spent).\n');
