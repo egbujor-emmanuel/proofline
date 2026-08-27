@@ -133,5 +133,21 @@ test('no covering test -> not_verified (no evidence pack access needed)', () => 
   assert.strictEqual(result['ac-99-does-not-exist'].kane, null);
 });
 
+// --- A genuinely unreadable evidence pack (real failure mode, not mocked) -
+// A nonexistent path reproduces exactly what a corrupt/missing pack, or a
+// non-Windows host missing PowerShell, would look like: findResultDetails
+// must catch the failure and return status: null with an error message,
+// not throw and crash the whole classify() call.
+const MISSING_PACK = path.join(REPO_ROOT, '.testmuai', 'evidence', 'this-pack-does-not-exist.evidence');
+
+test('unreadable evidence pack -> test_failure_unclassified, not a crash', () => {
+  const result = classify(REPO_ROOT, ['ac-3'], MISSING_PACK, {
+    'dashboard-upgrade-stays-in-place-and-shows-success-without_test.md': 'failed',
+  });
+  assert.strictEqual(result['ac-3'].state, STATES.TEST_FAILURE_UNCLASSIFIED);
+  assert.strictEqual(result['ac-3'].kane.status, null);
+  assert.ok(result['ac-3'].reason.includes('Could not read evidence pack'), 'reason should surface the real read failure');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

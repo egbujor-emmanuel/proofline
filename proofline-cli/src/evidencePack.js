@@ -54,14 +54,40 @@ function findResultDetails(evidencePackPath, testFilePath) {
     $zip.Dispose()
   `;
 
-  const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { encoding: 'utf-8' });
+  // Deliberately caught, not thrown: a pack-reading failure (PowerShell
+  // unavailable, corrupt zip, unreadable path, non-Windows host) must not
+  // crash the whole run. evidenceStrength.js already treats status: null as
+  // "can't confirm agent-misstep or product-bug" and conservatively falls
+  // back to test_failure_unclassified -- the correct behavior here too,
+  // rather than a raw stack trace three modules away from where it happened.
+  let output;
+  try {
+    output = execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+  } catch (err) {
+    return {
+      status: null,
+      flaky: false,
+      adaptiveHealTriggered: false,
+      error: `Could not read evidence pack "${evidencePackPath}": ${err.message}. This implementation reads .evidence packs via PowerShell + .NET ZipFile and currently requires Windows.`,
+    };
+  }
 
   const statusMatch = output.match(/^status:\s*(\S+)/m);
   const flakyMatch = output.match(/^flaky:\s*(\S+)/m);
   const adaptiveHealMatch = output.match(/^adaptive_heal:\s*\n\s+triggered:\s*(\S+)/m);
 
+  if (!statusMatch) {
+    return {
+      status: null,
+      flaky: false,
+      adaptiveHealTriggered: false,
+      error: `Evidence pack read but no matching tests/<dir>/result.yaml entry was found for test file "${testFilePath}" (looked for a directory name starting with its slug, "${fileSlug}"). The pack may use a different naming convention than the one confirmed against real packs so far.`,
+      raw: output,
+    };
+  }
+
   return {
-    status: statusMatch ? statusMatch[1] : null,
+    status: statusMatch[1],
     flaky: flakyMatch ? flakyMatch[1] === 'true' : false,
     adaptiveHealTriggered: adaptiveHealMatch ? adaptiveHealMatch[1] === 'true' : false,
     raw: output,

@@ -1,7 +1,6 @@
 const path = require('path');
 const { allTests } = require('./verifiesParser');
 const { listNodes, getTestByTitle } = require('./contextGraph');
-const { coverForPack } = require('./coverage');
 const { findResultDetails } = require('./evidencePack');
 
 const STATES = {
@@ -56,10 +55,13 @@ const STATES = {
 function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {}) {
   const nodes = listNodes(repoRoot);
   const tests = allTests(repoRoot);
-  // Kept as a secondary/supplementary signal (pack validity, use-case-level
-  // completeness) -- NOT the primary pass/fail source. See note in kane.js.
-  const pack = coverForPack(repoRoot, evidencePackPath);
-
+  // Previously also called coverForPack() here unconditionally as a
+  // "pack validity" side-effect check, but that result was never actually
+  // read anywhere below -- dead code, and confirmed by a real test to be
+  // the exact thing that crashed classify() on an unreadable pack (Kane's
+  // own `cover` throws on a missing pack). Removed rather than defensively
+  // wrapped: it served no function once removed, so there's nothing to
+  // preserve.
   const results = {};
 
   for (const acId of candidateAcIds) {
@@ -121,7 +123,7 @@ function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {})
       } else {
         results[acId] = {
           state: STATES.TEST_FAILURE_UNCLASSIFIED,
-          reason: `Covering test "${verifyingTest.title}" did not pass (member status: ${memberStatus[fileBasename] || 'unknown'}, Kane pack status: ${kane.status || 'unreadable'}), and this run's evidence pack does not clearly classify it as agent-misstep or product-bug. Treat as needing human review, not an automatic BLOCK.`,
+          reason: `Covering test "${verifyingTest.title}" did not pass (member status: ${memberStatus[fileBasename] || 'unknown'}, Kane pack status: ${kane.status || 'unreadable'}${detail.error ? ` -- ${detail.error}` : ''}), and this run's evidence pack does not clearly classify it as agent-misstep or product-bug. Treat as needing human review, not an automatic BLOCK.`,
           test: verifyingTest.title,
           kane,
         };
