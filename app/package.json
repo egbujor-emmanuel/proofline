@@ -1,0 +1,12 @@
+{
+  "name": "subscription-dashboard",
+  "version": "1.0.0",
+  "description": "Small real subscription app used as the Kane/Proofline verification target.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

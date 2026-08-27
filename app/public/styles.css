@@ -1,0 +1,62 @@
+body {
+  font-family: system-ui, sans-serif;
+  background: #f4f4f6;
+  display: flex;
+  justify-content: center;
+  padding-top: 4rem;
+}
+
+.card {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  width: 360px;
+}
+
+.plan-badge {
+  font-weight: bold;
+  padding: 0.1rem 0.6rem;
+  border-radius: 6px;
+}
+
+.plan-free {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.plan-pro {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+#upgrade-btn {
+  background: #4f46e5;
+  color: white;
+}
+
+.dev-button {
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+
+.message {
+  color: #065f46;
+  min-height: 1.2rem;
+}
+
+#pro-feature-section {
+  margin-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+}

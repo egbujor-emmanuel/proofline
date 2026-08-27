@@ -1,0 +1,6 @@
+node_modules/
+app/server/db/data.json
+.context/
+.testmuai/
+.evidence/
+output-*/
