@@ -1,8 +1,9 @@
 const { STATES } = require('./evidenceStrength');
 
 const ICONS = {
-  [STATES.MACHINE_VERIFIED]: '\u{1F7E2}', // green circle
-  [STATES.TEST_LINKED_ONLY]: '\u{1F7E1}', // yellow circle
+  [STATES.MACHINE_VERIFIED_CLEAN]: '\u{1F7E2}', // green circle
+  [STATES.MACHINE_VERIFIED_HEALED]: '\u{1F7E1}', // yellow circle
+  [STATES.TEST_LINKED_ONLY]: '\u{1F7E1}',
   [STATES.NOT_VERIFIED]: '\u{1F534}', // red circle
   [STATES.PRODUCT_BUG]: '\u{1F534}',
   [STATES.AGENT_MISSTEP]: '\u{1F7E1}',
@@ -11,7 +12,8 @@ const ICONS = {
 };
 
 const LABELS = {
-  [STATES.MACHINE_VERIFIED]: 'MACHINE VERIFIED',
+  [STATES.MACHINE_VERIFIED_CLEAN]: 'MACHINE VERIFIED',
+  [STATES.MACHINE_VERIFIED_HEALED]: 'MACHINE VERIFIED -- HEALED',
   [STATES.TEST_LINKED_ONLY]: 'TEST-LINKED, NOT INDEPENDENTLY ASSERTED',
   [STATES.NOT_VERIFIED]: 'NOT VERIFIED',
   [STATES.PRODUCT_BUG]: 'PRODUCT BUG -- REQUIREMENT BROKEN',
@@ -20,6 +22,13 @@ const LABELS = {
   [STATES.UNAFFECTED]: 'UNAFFECTED',
 };
 
+/**
+ * Conservative by construction: SHIP requires every affected AC to be
+ * machine_verified_clean specifically. A healed/flaky pass, a test-linked-
+ * only AC, an agent misstep, or an unclassified failure all fall back to
+ * REVIEW REQUIRED rather than either extreme -- confirmed necessary by a
+ * real run where a healed pass let an actual regression through.
+ */
 function decide(evidenceByAc) {
   const states = Object.values(evidenceByAc).map((e) => e.state);
   if (states.includes(STATES.PRODUCT_BUG)) {
@@ -31,10 +40,13 @@ function decide(evidenceByAc) {
   if (states.includes(STATES.AGENT_MISSTEP) || states.includes(STATES.TEST_FAILURE_UNCLASSIFIED)) {
     return { verdict: 'REVIEW REQUIRED', reason: 'Verification did not complete cleanly for at least one affected AC due to a test-agent error, not a confirmed product defect. Re-run verification before deciding.' };
   }
+  if (states.includes(STATES.MACHINE_VERIFIED_HEALED)) {
+    return { verdict: 'REVIEW REQUIRED', reason: 'At least one affected AC only has machine-verified evidence from a flaky or adaptively-healed execution -- Kane\'s own re-authoring changed what the test checks, on a confirmed real prior run. Re-verify with a clean run before shipping.' };
+  }
   if (states.includes(STATES.TEST_LINKED_ONLY)) {
     return { verdict: 'REVIEW REQUIRED', reason: 'At least one affected AC is only test-linked, not independently machine-asserted -- Kane\'s evidence for it is weaker than a direct check.' };
   }
-  return { verdict: 'SHIP', reason: 'All affected ACs are machine verified.' };
+  return { verdict: 'SHIP', reason: 'All affected ACs are machine verified on clean, non-healed executions.' };
 }
 
 function render({ changedFiles, uncoveredFiles, candidates, evidenceByAc, notYetVerified }) {

@@ -2,10 +2,11 @@ const path = require('path');
 const { allTests } = require('./verifiesParser');
 const { listNodes, getTestByTitle } = require('./contextGraph');
 const { coverForPack } = require('./coverage');
-const { findResultStatus } = require('./evidencePack');
+const { findResultDetails } = require('./evidencePack');
 
 const STATES = {
-  MACHINE_VERIFIED: 'machine_verified',
+  MACHINE_VERIFIED_CLEAN: 'machine_verified_clean',
+  MACHINE_VERIFIED_HEALED: 'machine_verified_healed',
   TEST_LINKED_ONLY: 'test_linked_only',
   NOT_VERIFIED: 'not_verified',
   UNAFFECTED: 'unaffected',
@@ -17,17 +18,34 @@ const STATES = {
 /**
  * Classifies each candidate AC's evidence strength against one specific,
  * known evidence pack (the one Proofline's own targeted testrun just
- * produced). Distinguishes:
- *  - machine_verified: this AC is the test's check.verified_against target,
- *    and the pack shows the use-case's ACs passing.
- *  - test_linked_only: a live test @verifies this AC, the pack shows ACs
- *    passing, but this AC is NOT the test's check.verified_against target --
- *    it rode on a different AC's runtime assertion (Kane confirmed: strict
- *    vs lenient rollup does not distinguish this; ac-1/ac-2/ac-6 all show
- *    identical proven counts under both).
+ * produced). Every result carries both:
+ *  - `kane`: Kane's own raw signal (status/flaky/adaptiveHealTriggered),
+ *    never mutated -- so Proofline can always say "Kane reported X;
+ *    Proofline classified it as Y because Z" rather than collapsing the two.
+ *  - `state`: Proofline's own interpretation, one of:
+ *
+ *  - machine_verified_clean: this AC is the test's check.verified_against
+ *    target, the test passed, AND the execution carries no flaky/
+ *    adaptive-heal integrity warning. Confirmed via a real pack: a clean
+ *    passing result.yaml has neither field present at all.
+ *  - machine_verified_healed: same as above, but the execution WAS flaky or
+ *    adaptively healed. Confirmed via a real pack (the first
+ *    regression-detection attempt, before the test was strengthened): a
+ *    passing run silently re-authored its own failing tail after a replay
+ *    miss, and the healed assertion ended up checking the wrong thing
+ *    (optimistic UI state instead of persisted state) -- it let a real
+ *    regression through. `proven` from Kane must never be flattened into
+ *    "independently machine verified" without this check.
+ *  - test_linked_only: a live test @verifies this AC, the test passed, but
+ *    this AC is NOT the test's check.verified_against target -- it rode on
+ *    a different AC's runtime assertion (Kane confirmed: strict vs lenient
+ *    rollup does not distinguish this; ac-1/ac-2/ac-6 all show identical
+ *    proven counts under both).
  *  - not_verified: no live test verifies this AC at all.
  *  - product_bug: the covering test completed and its assertion genuinely
- *    failed against the real application -- a confirmed product defect.
+ *    failed against the real application (Kane's own result.yaml status:
+ *    "failed", generally paired with a confirmed bug-detection verdict) --
+ *    a real product defect, not a test/agent error.
  *  - agent_misstep: the covering test's run did not complete (Kane's own
  *    evidence pack marks it "broken", not "failed") -- the test-agent
  *    couldn't act, which is NOT evidence the product is broken.
@@ -39,7 +57,7 @@ function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {})
   const nodes = listNodes(repoRoot);
   const tests = allTests(repoRoot);
   // Kept as a secondary/supplementary signal (pack validity, use-case-level
-  // completeness) -- NOT the primary pass/fail source. See note below.
+  // completeness) -- NOT the primary pass/fail source. See note in kane.js.
   const pack = coverForPack(repoRoot, evidencePackPath);
 
   const results = {};
@@ -51,6 +69,7 @@ function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {})
       results[acId] = {
         state: STATES.NOT_VERIFIED,
         reason: 'No live *_test.md file verifies this AC.',
+        kane: null,
       };
       continue;
     }
@@ -60,6 +79,7 @@ function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {})
       results[acId] = {
         state: STATES.NOT_VERIFIED,
         reason: `Test file claims to verify ${acId}, but its graph node could not be resolved (run "kane-cli context name --backfill" if a logical id drifted after re-authoring).`,
+        kane: null,
       };
       continue;
     }
@@ -73,49 +93,66 @@ function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {})
     const fileBasename = path.basename(verifyingTest.filePath);
     const testPassed = memberStatus[fileBasename] === 'passed';
 
-    if (!testPassed) {
-      // Real signal, confirmed by direct inspection of a sealed evidence
-      // pack: result.yaml's own `status` field distinguishes "broken" (the
-      // agent got stuck / couldn't act -- Kane's own nested run_summary
-      // showed "AP determined agent is stuck, no viable actions remain")
-      // from a genuine completed-but-failed assertion. Never flatten these:
-      // an agent misstep is not evidence the product is broken.
-      const packStatus = findResultStatus(evidencePackPath, verifyingTest.filePath);
+    // Real per-test detail, confirmed by direct inspection of sealed
+    // evidence packs -- see evidencePack.js for what each field means and
+    // how it was confirmed. Fetched regardless of pass/fail: needed for the
+    // clean/healed split on the pass side, and for the misstep/bug split on
+    // the fail side.
+    const detail = findResultDetails(evidencePackPath, verifyingTest.filePath);
+    const kane = { status: detail.status, flaky: detail.flaky, adaptiveHealTriggered: detail.adaptiveHealTriggered };
 
-      if (packStatus === 'broken') {
+    if (!testPassed) {
+      // Never flatten these: an agent misstep is not evidence the product
+      // is broken.
+      if (kane.status === 'broken') {
         results[acId] = {
           state: STATES.AGENT_MISSTEP,
-          reason: `REVIEW REQUIRED -- Verification failed due to test-agent error (Kane could not complete "${verifyingTest.title}"). No product defect established.`,
+          reason: `Kane reported this execution as "broken" (the test-agent could not complete "${verifyingTest.title}"). REVIEW REQUIRED -- no product defect established.`,
           test: verifyingTest.title,
+          kane,
         };
-      } else if (packStatus === 'failed') {
+      } else if (kane.status === 'failed') {
         results[acId] = {
           state: STATES.PRODUCT_BUG,
-          reason: `Test "${verifyingTest.title}" completed and its assertion failed against the real running application. This is a genuine product-behavior failure, not a test/agent error.`,
+          reason: `Kane reported this execution as "failed" -- test "${verifyingTest.title}" completed and its assertion failed against the real running application. This is a genuine product-behavior failure, not a test/agent error.`,
           test: verifyingTest.title,
+          kane,
         };
       } else {
         results[acId] = {
           state: STATES.TEST_FAILURE_UNCLASSIFIED,
-          reason: `Covering test "${verifyingTest.title}" did not pass (member status: ${memberStatus[fileBasename] || 'unknown'}, pack status: ${packStatus || 'unreadable'}), and this run's evidence pack does not clearly classify it as agent-misstep or product-bug. Treat as needing human review, not an automatic BLOCK.`,
+          reason: `Covering test "${verifyingTest.title}" did not pass (member status: ${memberStatus[fileBasename] || 'unknown'}, Kane pack status: ${kane.status || 'unreadable'}), and this run's evidence pack does not clearly classify it as agent-misstep or product-bug. Treat as needing human review, not an automatic BLOCK.`,
           test: verifyingTest.title,
+          kane,
         };
       }
       continue;
     }
 
     const checkedAc = testNode.check && testNode.check.verified_against;
-    if (checkedAc === acId) {
-      results[acId] = {
-        state: STATES.MACHINE_VERIFIED,
-        reason: `Test "${verifyingTest.title}" has an explicit runtime check (${testNode.check.kind}: ${testNode.check.operator} ${testNode.check.operand}) targeting exactly this AC.`,
-        test: verifyingTest.title,
-      };
-    } else {
+    if (checkedAc !== acId) {
       results[acId] = {
         state: STATES.TEST_LINKED_ONLY,
         reason: `Test "${verifyingTest.title}" claims to verify this AC (@verifies ${verifyingTest.verifies.join(', ')}), but its explicit runtime check targets ${checkedAc || 'a different AC'} instead. Kane's own coverage counts this AC as "proven" alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.`,
         test: verifyingTest.title,
+        kane,
+      };
+      continue;
+    }
+
+    if (kane.flaky || kane.adaptiveHealTriggered) {
+      results[acId] = {
+        state: STATES.MACHINE_VERIFIED_HEALED,
+        reason: `Kane reported PASS for "${verifyingTest.title}"'s explicit runtime check (${testNode.check.kind}: ${testNode.check.operator} ${testNode.check.operand}) targeting this AC -- but the execution was flaky/adaptively healed (Kane silently re-authored the failing tail). Proofline requires review before treating this as clean verification: a healed re-authoring has been confirmed, on a real prior run, to change what a test actually checks.`,
+        test: verifyingTest.title,
+        kane,
+      };
+    } else {
+      results[acId] = {
+        state: STATES.MACHINE_VERIFIED_CLEAN,
+        reason: `Kane reported PASS for "${verifyingTest.title}"'s explicit runtime check (${testNode.check.kind}: ${testNode.check.operator} ${testNode.check.operand}) targeting exactly this AC, on a clean (non-flaky, non-healed) execution.`,
+        test: verifyingTest.title,
+        kane,
       };
     }
   }
