@@ -1,0 +1,12 @@
+{
+  "name": "proofline-cli",
+  "version": "0.1.0",
+  "description": "Given a code change, determines which product requirements are at risk and how strong Kane's evidence is that they still hold.",
+  "main": "bin/proofline.js",
+  "bin": {
+    "proofline": "bin/proofline.js"
+  },
+  "scripts": {
+    "start": "node bin/proofline.js"
+  }
+}
