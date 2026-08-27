@@ -1,13 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { kaneExec } = require('./kaneExec');
 
 function listNodes(repoRoot) {
-  const raw = execFileSync('kane-cli', ['context', 'list', '--json'], {
-    cwd: repoRoot,
-    encoding: 'utf-8',
-    shell: true,
-  });
+  const raw = kaneExec(['context', 'list', '--json'], { cwd: repoRoot });
   return raw
     .split('\n')
     .map((l) => l.trim())

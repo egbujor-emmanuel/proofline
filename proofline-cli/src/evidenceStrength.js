@@ -27,9 +27,11 @@ const STATES = {
  *    requires the run's own bug-detection verdict, captured live by whatever
  *    invoked the targeted testrun).
  */
-function classify(repoRoot, candidateAcIds, evidencePackPath) {
+function classify(repoRoot, candidateAcIds, evidencePackPath, memberStatus = {}) {
   const nodes = listNodes(repoRoot);
   const tests = allTests(repoRoot);
+  // Kept as a secondary/supplementary signal (pack validity, use-case-level
+  // completeness) -- NOT the primary pass/fail source. See note below.
   const pack = coverForPack(repoRoot, evidencePackPath);
 
   const results = {};
@@ -54,16 +56,19 @@ function classify(repoRoot, candidateAcIds, evidencePackPath) {
       continue;
     }
 
-    const ucEntry = pack.depth.find((d) =>
-      // the use-case this AC's check ultimately rolls up into
-      true
-    );
-    const useCasePassed = ucEntry && ucEntry.acs.failed === 0 && ucEntry.acs.blocked === 0;
+    // Per-TEST pass/fail (from testrun's own member-level events), not
+    // per-use-case aggregate: `cover`'s depth.acs is aggregated across every
+    // test in the AC's use-case, so it would incorrectly blame ac-1 (covered
+    // only by a passing test) for a different, unrelated test's failure in
+    // the same use-case. Confirmed necessary by a real run: t-1 passed,
+    // t-2 failed, both roll up into the same use-case in `cover` output.
+    const fileBasename = require('path').basename(verifyingTest.filePath);
+    const testPassed = memberStatus[fileBasename] === 'passed';
 
-    if (!useCasePassed) {
+    if (!testPassed) {
       results[acId] = {
         state: STATES.EXECUTION_ERROR,
-        reason: `Covering test "${verifyingTest.title}" did not cleanly pass in evidence pack ${evidencePackPath}.`,
+        reason: `Covering test "${verifyingTest.title}" (${fileBasename}) did not pass in this run (status: ${memberStatus[fileBasename] || 'unknown'}). This module does not itself distinguish agent-misstep from product-bug -- check the run's own bug-detection verdict for that.`,
         test: verifyingTest.title,
       };
       continue;

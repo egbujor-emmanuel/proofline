@@ -4,7 +4,7 @@ const { changedFiles, diffText } = require('../src/git');
 const { mapChangedFilesToCandidates } = require('../src/acMap');
 const { refineCandidates } = require('../src/llmRank');
 const { listNodes, getAc } = require('../src/contextGraph');
-const { resolveTestIdsForAcs, runTargeted } = require('../src/kane');
+const { resolveTestFilesForAcs, runTargeted } = require('../src/kane');
 const { classify } = require('../src/evidenceStrength');
 const { render } = require('../src/verdict');
 
@@ -45,17 +45,17 @@ async function main() {
   }
 
   const acIds = refined.map((c) => c.ac);
-  const { testIds, unresolved } = resolveTestIdsForAcs(REPO_ROOT, acIds);
+  const { files: testFiles, unresolved } = resolveTestFilesForAcs(REPO_ROOT, acIds);
 
-  if (testIds.length === 0) {
+  if (testFiles.length === 0) {
     console.log('No live Kane tests resolve for the affected ACs:', unresolved.join(', '));
     return;
   }
 
-  console.log(`Running targeted Kane verification for test(s): ${testIds.join(', ')}`);
+  console.log(`Running targeted Kane verification for: ${testFiles.map((f) => path.basename(f)).join(', ')}`);
   console.log('(NOTE: any test not yet authored/cached will consume real Kane credits.)\n');
 
-  const { events, evidencePath, raw } = runTargeted(REPO_ROOT, testIds);
+  const { events, evidencePath, raw, memberStatus } = runTargeted(REPO_ROOT, testFiles);
   const runEnd = events.find((e) => e.type === 'run_end' || e.type === 'test_md_summary');
 
   if (!evidencePath) {
@@ -65,7 +65,7 @@ async function main() {
     return;
   }
 
-  const evidenceByAc = classify(REPO_ROOT, acIds, evidencePath);
+  const evidenceByAc = classify(REPO_ROOT, acIds, evidencePath, memberStatus);
   const report = render({ changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc });
   console.log(report.text);
 }

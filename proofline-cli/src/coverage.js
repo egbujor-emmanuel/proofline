@@ -1,4 +1,4 @@
-const { execFileSync } = require('child_process');
+const { kaneExec } = require('./kaneExec');
 
 /**
  * Reads Kane's own coverage computation for a specific, known evidence pack.
@@ -7,11 +7,7 @@ const { execFileSync } = require('child_process');
  * just produced, so it never has to guess which execution a stat came from.
  */
 function coverForPack(repoRoot, evidencePackPath) {
-  const raw = execFileSync(
-    'kane-cli',
-    ['cover', '--json', '--from', evidencePackPath],
-    { cwd: repoRoot, encoding: 'utf-8', shell: true }
-  );
+  const raw = kaneExec(['cover', '--json', '--from', evidencePackPath], { cwd: repoRoot });
   return JSON.parse(raw);
 }
 
