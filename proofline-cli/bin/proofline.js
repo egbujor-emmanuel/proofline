@@ -58,6 +58,9 @@ async function main() {
   const { events, evidencePath, raw, memberStatus } = runTargeted(REPO_ROOT, testFiles);
   const runEnd = events.find((e) => e.type === 'run_end' || e.type === 'test_md_summary');
 
+  console.log(`Evidence pack used: ${evidencePath || '(none)'}`);
+  console.log(`Member status: ${JSON.stringify(memberStatus)}\n`);
+
   if (!evidencePath) {
     console.log('Targeted run finished but no evidence pack path could be recovered.');
     console.log('Last NDJSON event seen:', JSON.stringify(runEnd, null, 2));
