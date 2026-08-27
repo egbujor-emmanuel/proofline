@@ -75,13 +75,19 @@ function callApi(prompt) {
 
 function callCli(prompt) {
   // `claude -p` runs a single non-interactive prompt and prints the reply.
+  // The prompt goes in on STDIN, never as an argv element: passing a long
+  // multi-line prompt as a command-line argument was confirmed by a real
+  // run to fail outright on Windows, where shell:true routes through
+  // cmd.exe and the embedded newlines/quotes destroy the command. stdin has
+  // no such parsing layer and no length limit worth worrying about.
   const cmd = process.platform === 'win32' ? 'claude.cmd' : 'claude';
-  return execFileSync(cmd, ['-p', prompt], {
+  return execFileSync(cmd, ['-p'], {
+    input: prompt,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     shell: process.platform === 'win32',
     maxBuffer: 10 * 1024 * 1024,
-    timeout: 120000,
+    timeout: 180000,
   });
 }
 
