@@ -42,8 +42,17 @@ function changedFiles(cwd, ref = 'HEAD') {
     .filter((f) => !isKaneOwned(f));
 }
 
+/**
+ * The diff handed to the reasoning layer, with Kane-owned paths excluded by
+ * the same rule as changedFiles(). Filtering only the file list and not the
+ * diff text left the model reading Kane's own graph blobs -- confirmed by a
+ * real run whose rationale cited "AC-01.1 in the new blob", i.e. it was
+ * reasoning about the requirements graph rather than the application change.
+ */
 function diffText(cwd, ref = 'HEAD') {
-  return run(['diff', ref], cwd);
+  const paths = changedFiles(cwd, ref);
+  if (paths.length === 0) return '';
+  return run(['diff', ref, '--', ...paths], cwd);
 }
 
 module.exports = { changedFiles, diffText, isKaneOwned };
