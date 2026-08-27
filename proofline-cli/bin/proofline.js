@@ -7,6 +7,8 @@ const { resolveTestFilesForAcs, runTargeted } = require('../src/kane');
 const { classify } = require('../src/evidenceStrength');
 const { render } = require('../src/verdict');
 const { checkEnvironment } = require('../src/preflight');
+const { buildReport } = require('../src/report');
+const fs = require('fs');
 
 const HELP = `
 proofline -- which product requirements does this code change put at risk?
@@ -15,14 +17,16 @@ Usage:
   proofline [--dry-run] [--ref <git-ref>] [--repo <path>]
 
 Options:
-  --dry-run       Mapping only: shows affected ACs, no Kane verification,
-                   no credits spent.
-  --ref <ref>     Diff against this git ref instead of HEAD (e.g. HEAD~1,
-                   a commit hash, a branch name).
-  --repo <path>   Run against this repository instead of the current
-                   directory. Must already have a Kane context graph
-                   (requirements ingested) and live *_test.md files.
-  --help, -h      Show this help.
+  --dry-run        Mapping only: shows affected ACs, no Kane verification,
+                    no credits spent.
+  --ref <ref>      Diff against this git ref instead of HEAD (e.g. HEAD~1,
+                    a commit hash, a branch name).
+  --repo <path>    Run against this repository instead of the current
+                    directory. Must already have a Kane context graph
+                    (requirements ingested) and live *_test.md files.
+  --report <file>  Also write a self-contained HTML evidence report you can
+                    open, share, or attach to a pull request.
+  --help, -h       Show this help.
 
 Requires: a git repository, kane-cli on PATH and authenticated, and the
 target repo's requirements already run through Kane's assurance lifecycle
@@ -30,7 +34,8 @@ target repo's requirements already run through Kane's assurance lifecycle
 own existing requirements corpus, it does not invent one.
 `.trim();
 
-const KNOWN_FLAGS = new Set(['--dry-run', '--ref', '--repo', '--help', '-h']);
+const KNOWN_FLAGS = new Set(['--dry-run', '--ref', '--repo', '--report', '--help', '-h']);
+const VALUE_FLAGS = new Set(['--ref', '--repo', '--report']);
 
 function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
@@ -39,7 +44,7 @@ function parseArgs(argv) {
       if (!KNOWN_FLAGS.has(a)) {
         throw new Error(`Unknown flag "${a}". Run with --help for usage.`);
       }
-      if ((a === '--ref' || a === '--repo') && !argv[i + 1]) {
+      if (VALUE_FLAGS.has(a) && !argv[i + 1]) {
         throw new Error(`${a} requires a value. Run with --help for usage.`);
       }
     }
@@ -50,13 +55,25 @@ function parseArgs(argv) {
   const ref = refIdx >= 0 ? argv[refIdx + 1] : 'HEAD';
   const repoIdx = argv.indexOf('--repo');
   const repoRoot = repoIdx >= 0 ? path.resolve(argv[repoIdx + 1]) : process.cwd();
+  const reportIdx = argv.indexOf('--report');
+  const reportPath = reportIdx >= 0 ? path.resolve(argv[reportIdx + 1]) : null;
   const help = argv.includes('--help') || argv.includes('-h');
 
-  return { dryRun, ref, repoRoot, help };
+  return { dryRun, ref, repoRoot, reportPath, help };
+}
+
+function writeReport(reportPath, data) {
+  if (!reportPath) return;
+  try {
+    fs.writeFileSync(reportPath, buildReport(data), 'utf-8');
+    console.log(`\nHTML evidence report written to: ${reportPath}`);
+  } catch (err) {
+    console.error(`\nCould not write report to ${reportPath}: ${err.message}`);
+  }
 }
 
 async function main() {
-  const { dryRun, ref, repoRoot, help } = parseArgs(process.argv.slice(2));
+  const { dryRun, ref, repoRoot, reportPath, help } = parseArgs(process.argv.slice(2));
 
   if (help) {
     console.log(HELP);
@@ -81,6 +98,7 @@ async function main() {
 
   if (candidates.length === 0) {
     console.log(render({ changedFiles: files, uncoveredFiles, candidates: [], evidenceByAc: {} }).text);
+    writeReport(reportPath, { repoRoot, ref, changedFiles: files, uncoveredFiles, candidates: [], evidenceByAc: {}, evidencePath: null, dryRun });
     return;
   }
 
@@ -89,6 +107,7 @@ async function main() {
   if (dryRun) {
     console.log('DRY RUN -- mapping only, no Kane verification executed (no credits spent).\n');
     console.log(render({ changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc: {}, notYetVerified: true }).text);
+    writeReport(reportPath, { repoRoot, ref, changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc: {}, evidencePath: null, dryRun: true });
     return;
   }
 
@@ -120,6 +139,10 @@ async function main() {
   const evidenceByAc = classify(repoRoot, acIds, evidencePath, memberStatus);
   const report = render({ changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc });
   console.log(report.text);
+  writeReport(reportPath, { repoRoot, ref, changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc, evidencePath, dryRun: false });
+
+  // Non-zero exit on BLOCK so this can gate a pre-commit hook or CI step.
+  if (report.verdict === 'BLOCK') process.exitCode = 1;
 }
 
 main().catch((err) => {
