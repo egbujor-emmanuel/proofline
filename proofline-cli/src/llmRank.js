@@ -1,27 +1,24 @@
-const https = require('https');
+const { detectProvider, complete } = require('./llmProvider');
 
 /**
- * Reasoning step over the structurally-narrowed candidates, given the FULL
- * live AC corpus (not just the narrowed set) so it can also catch an AC the
- * deterministic term-overlap layer missed entirely -- structural overlap is
- * a recall aid, not a hard filter; the LLM is the actual judgment call.
- * Requires ANTHROPIC_API_KEY. If it is not set, this is a real no-op that
- * says so explicitly -- it does not fabricate a confidence score or
- * rationale, and does not add any AC the structural layer didn't already
- * find (an unrefined result understates risk rather than inventing it).
+ * Optional reasoning step over the structurally-narrowed candidates, given
+ * the FULL live AC corpus (not just the narrowed set) so it can also catch
+ * an AC the deterministic layer missed entirely.
+ *
+ * This is a REFINEMENT, never a requirement. src/acMap.js already produces
+ * IDF-weighted, ranked, confidence-scored candidates with no model involved
+ * -- validated against ground truth (it ranks the AC a real regression
+ * actually broke first, with high confidence). When no provider is
+ * available this degrades honestly: it keeps the deterministic ranking,
+ * says exactly why it wasn't refined, and never fabricates a score or
+ * invents an AC.
+ *
+ * Works with either ANTHROPIC_API_KEY or the `claude` CLI (which uses an
+ * existing Claude subscription rather than paid API credits) -- see
+ * llmProvider.js.
  */
-async function refineCandidates(diffText, candidates, allAcs) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return candidates.map((c) => ({
-      ...c,
-      llm_refined: false,
-      rationale: 'ANTHROPIC_API_KEY not set -- using structurally-narrowed candidate as-is, unrefined.',
-    }));
-  }
-
-  const structuralAcIds = new Set(candidates.map((c) => c.ac));
-  const prompt = [
+function buildPrompt(diffText, structuralAcIds, allAcs) {
+  return [
     'You are determining which acceptance criteria a real code change puts at risk.',
     'You are given the diff and the FULL list of live acceptance criteria for this project -- not a pre-filtered set.',
     `A structural term-overlap pass already flagged these as likely candidates: ${[...structuralAcIds].join(', ') || '(none)'}.`,
@@ -35,70 +32,68 @@ async function refineCandidates(diffText, candidates, allAcs) {
     'DIFF:',
     diffText.slice(0, 8000),
     '',
-    'Respond as JSON array: [{"ac": "ac-1", "confidence": "high", "rationale": "..."}]',
+    'Respond with ONLY a JSON array, no prose or code fences: [{"ac": "ac-1", "confidence": "high", "rationale": "..."}]',
   ].join('\n');
+}
 
-  const body = JSON.stringify({
-    model: 'claude-sonnet-5',
-    max_tokens: 1024,
-    messages: [{ role: 'user', content: prompt }],
-  });
+function parseResponse(text) {
+  // Tolerate a fenced block or surrounding prose: take the first JSON array.
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('no JSON array found in model response');
+  return JSON.parse(match[0]);
+}
 
-  const responseText = await new Promise((resolve, reject) => {
-    const req = https.request(
-      {
-        hostname: 'api.anthropic.com',
-        path: '/v1/messages',
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-length': Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => resolve(data));
-      }
+function unrefined(candidates, why) {
+  return candidates.map((c) => ({ ...c, llm_refined: false, rationale: why }));
+}
+
+async function refineCandidates(diffText, candidates, allAcs) {
+  const provider = detectProvider();
+  if (provider.kind === 'none') {
+    return unrefined(
+      candidates,
+      'No model provider available (set ANTHROPIC_API_KEY, or install the `claude` CLI to use an existing Claude subscription) -- using the deterministic IDF-weighted ranking as-is.'
     );
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
+  }
+
+  const structuralAcIds = new Set(candidates.map((c) => c.ac));
+  const prompt = buildPrompt(diffText, structuralAcIds, allAcs);
+
+  let result;
+  try {
+    result = await complete(prompt);
+  } catch (err) {
+    return unrefined(candidates, `Model call via ${provider.detail} failed (${err.message}) -- using the deterministic IDF-weighted ranking as-is.`);
+  }
 
   let parsed;
   try {
-    const outer = JSON.parse(responseText);
-    parsed = JSON.parse(outer.content[0].text);
+    parsed = parseResponse(result.text);
   } catch (err) {
-    return candidates.map((c) => ({
-      ...c,
-      llm_refined: false,
-      rationale: `LLM call succeeded but response could not be parsed (${err.message}) -- using rule-based candidate as-is.`,
-    }));
+    return unrefined(candidates, `Model responded via ${provider.detail} but the reply could not be parsed (${err.message}) -- using the deterministic IDF-weighted ranking as-is.`);
   }
 
-  const byAc = new Map(parsed.map((p) => [p.ac, p]));
+  const byAc = new Map(parsed.filter((p) => p && p.ac).map((p) => [p.ac, p]));
+  const validAcIds = new Set(allAcs.map((a) => a.id));
 
   const refinedExisting = candidates.map((c) => {
     const refined = byAc.get(c.ac);
-    if (!refined) return { ...c, llm_refined: false, rationale: 'LLM did not return a ranking for this AC despite structural overlap -- kept, unrefined, rather than silently dropped.' };
-    return { ...c, llm_refined: true, confidence: refined.confidence, rationale: refined.rationale };
+    if (!refined) {
+      return { ...c, llm_refined: false, rationale: `Structurally flagged, but ${result.provider} did not rank it -- kept, unrefined, rather than silently dropped.` };
+    }
+    return { ...c, llm_refined: true, confidence: refined.confidence || c.confidence, rationale: refined.rationale };
   });
 
-  // ACs the LLM found that the structural pass missed entirely -- added
-  // with no `files` entries (they weren't structurally traced to a specific
-  // changed file) but clearly marked as LLM-added, not structurally flagged,
-  // so the mapping stays inspectable rather than silently expanding.
+  // ACs the model found that the structural pass missed. Filtered against
+  // the real graph so a hallucinated id can never enter the pipeline.
   const llmOnly = [...byAc.keys()]
-    .filter((ac) => !structuralAcIds.has(ac))
+    .filter((ac) => !structuralAcIds.has(ac) && validAcIds.has(ac))
     .map((ac) => ({
       ac,
-      confidence: byAc.get(ac).confidence,
-      rationale: `${byAc.get(ac).rationale} (LLM-identified; not structurally flagged by term overlap.)`,
+      confidence: byAc.get(ac).confidence || 'low',
+      rationale: `${byAc.get(ac).rationale} (Identified by ${result.provider}; not structurally flagged by term overlap.)`,
       files: [],
+      score: 0,
       llm_refined: true,
       llm_only: true,
     }));
@@ -106,4 +101,4 @@ async function refineCandidates(diffText, candidates, allAcs) {
   return [...refinedExisting, ...llmOnly];
 }
 
-module.exports = { refineCandidates };
+module.exports = { refineCandidates, buildPrompt, parseResponse };
