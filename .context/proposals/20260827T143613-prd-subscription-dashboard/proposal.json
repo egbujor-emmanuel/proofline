@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "read_basis": "sha256:06a6efbd498d108639a9e3b9deeb1cb9a74accd5fbc9255c81102f1030290397",
+  "source": {
+    "source_id": "prd-subscription-dashboard",
+    "source_cid": "sha256:2f4a9380d54eb0682cce60c91c2530d2cf6afb0c769d1930ed753fb6046e5f2f"
+  },
+  "use_cases": [
+    {
+      "temp_ref": "n1",
+      "title": "Upgrade to a Pro subscription",
+      "description": "A free account holder upgrades from the dashboard to the Pro plan through an in-app action that completes without full page navigation, records the new plan persistently on the server, confirms success in the same view, and leaves the account in the `pro` state on a fresh fetch or after reload, with no payment-processing step because the upgrade is defined here as a direct state change.",
+      "summary": "Upgrade a Free account to Pro.",
+      "actors": [
+        "free account holder"
+      ],
+      "value": "Moves eligible users onto the paid subscription state and ensures the upgrade is durably recorded for later use of Pro capabilities.",
+      "risk": "high",
+      "cite": {
+        "anchor": "L15-L15",
+        "quote": "A Free account can upgrade to Pro, and the upgrade is permanently recorded."
+      },
+      "cites": [
+        {
+          "anchor": "L15-L15",
+          "quote": "A Free account can upgrade to Pro, and the upgrade is permanently recorded."
+        },
+        {
+          "anchor": "L11-L11",
+          "quote": "persisted on the server and survive a page reload."
+        },
+        {
+          "anchor": "L60-L60",
+          "quote": "application. Upgrade is a direct state change with no payment step."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "only Free accounts can upgrade, and the target plan is Pro",
+          "cite": {
+            "anchor": "L5-L7",
+            "quote": "either `free` or `pro`. Free accounts can upgrade to Pro. Pro accounts get"
+          }
+        },
+        {
+          "text": "after a successful upgrade request, the persisted account plan is `pro` and a fresh fetch confirms it rather than cached state",
+          "cite": {
+            "anchor": "L17-L19",
+            "quote": "After a successful upgrade request, the account's persisted"
+          }
+        },
+        {
+          "text": "the dashboard triggers the upgrade without full page navigation and shows success confirmation in the same view",
+          "cite": {
+            "anchor": "L20-L22",
+            "quote": "Clicking the \"Upgrade to Pro\" button on the dashboard triggers"
+          }
+        },
+        {
+          "text": "upgrade is a direct state change with no payment step",
+          "cite": {
+            "anchor": "L58-L60",
+            "quote": "application. Upgrade is a direct state change with no payment step."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n2",
+      "title": "Access Advanced Reports according to subscription plan",
+      "description": "An account holder uses the dashboard's Advanced Reports feature when the account is on the `pro` plan, in which case the section is visible, its content loads, and direct API access succeeds, while `free` accounts are denied both dashboard and direct-endpoint access and are shown an upgrade prompt instead of report content.",
+      "summary": "Use Advanced Reports with plan-based access.",
+      "actors": [
+        "account holder"
+      ],
+      "value": "Delivers premium functionality to entitled users while enforcing subscription-based access control in both UI and API surfaces.",
+      "risk": "high",
+      "cite": {
+        "anchor": "L37-L37",
+        "quote": "Pro accounts can access the Pro-only feature (\"Advanced Reports\")."
+      },
+      "cites": [
+        {
+          "anchor": "L37-L37",
+          "quote": "Pro accounts can access the Pro-only feature (\"Advanced Reports\")."
+        },
+        {
+          "anchor": "L47-L47",
+          "quote": "Free accounts cannot access the Pro-only feature."
+        },
+        {
+          "anchor": "L7-L7",
+          "quote": "access to a Pro-only feature that Free accounts cannot use."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "Advanced Reports is a Pro-only feature: `pro` accounts can access it and `free` accounts cannot",
+          "cite": {
+            "anchor": "L37-L37",
+            "quote": "Pro accounts can access the Pro-only feature (\"Advanced Reports\")."
+          }
+        },
+        {
+          "text": "when the account plan is `pro`, the Advanced Reports section is visible on the dashboard and its content loads successfully",
+          "cite": {
+            "anchor": "L39-L40",
+            "quote": "When the account's plan is `pro`, the \"Advanced Reports\""
+          }
+        },
+        {
+          "text": "direct requests to the Pro-only API while the plan is `pro` return success (200) with feature content",
+          "cite": {
+            "anchor": "L41-L43",
+            "quote": "Requesting the Pro-only API endpoint directly while the"
+          }
+        },
+        {
+          "text": "when the account plan is `free`, the dashboard replaces Advanced Reports with an upgrade prompt instead of feature content",
+          "cite": {
+            "anchor": "L49-L51",
+            "quote": "When the account's plan is `free`, the \"Advanced Reports\""
+          }
+        },
+        {
+          "text": "direct requests to the Pro-only API while the plan is `free` return rejected (403) rather than feature content",
+          "cite": {
+            "anchor": "L52-L54",
+            "quote": "Requesting the Pro-only API endpoint directly while the"
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n3",
+      "title": "View the current subscription plan on the dashboard",
+      "description": "An account holder opens or reloads the dashboard and sees the true, persisted subscription plan fetched from the server—`Free` or `Pro` as currently stored—rather than a hardcoded or stale default, and after an upgrade the indicator must show `Pro` instead of continuing to display `Free`.",
+      "summary": "See the persisted plan on the dashboard.",
+      "actors": [
+        "account holder"
+      ],
+      "value": "Gives users an accurate, current view of their subscription state so the dashboard reflects real account status before and after changes.",
+      "risk": "med",
+      "cite": {
+        "anchor": "L26-L26",
+        "quote": "The dashboard always displays the account's true current plan."
+      },
+      "cites": [
+        {
+          "anchor": "L26-L26",
+          "quote": "The dashboard always displays the account's true current plan."
+        },
+        {
+          "anchor": "L8-L8",
+          "quote": "must always reflect the account's true, persisted plan."
+        },
+        {
+          "anchor": "L11-L11",
+          "quote": "persisted on the server and survive a page reload."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "on page load, the dashboard shows the server-persisted plan value, and the supported displayed states are \"Free\" or \"Pro\" rather than a hardcoded or stale default",
+          "cite": {
+            "anchor": "L28-L30",
+            "quote": "On page load, the dashboard displays the plan value currently"
+          }
+        },
+        {
+          "text": "after an upgrade and return or reload, the plan indicator shows \"Pro\" and must not continue showing \"Free\"",
+          "cite": {
+            "anchor": "L31-L33",
+            "quote": "After an upgrade completes and the user returns to (or"
+          }
+        }
+      ],
+      "depends_on_hint": []
+    }
+  ]
+}

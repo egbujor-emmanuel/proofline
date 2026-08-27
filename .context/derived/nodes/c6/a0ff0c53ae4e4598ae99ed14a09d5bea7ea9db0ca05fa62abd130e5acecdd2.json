@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"After a successful upgrade request, the account's persisted plan changes from `free` to `pro`.","kind":"state-transition","risk":"high","derived":true,"expected_answer":{"operator":"equals","baseline":"free","operand":"pro"}}}

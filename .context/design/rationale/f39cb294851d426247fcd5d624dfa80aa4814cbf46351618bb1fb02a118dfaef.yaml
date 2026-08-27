@@ -1,0 +1,9 @@
+anchor: ac-3
+combinatorial:
+  reason: Applied Equivalence partitioning to the source-defined eligible account partition (`free` can upgrade, target plan is `pro`). Applied State / flow to the in-dashboard action sequence and Negative / error to the forbidden payment-step promise. No covering array was needed because there were no independent user inputs or roles to combine; the risk-judged interaction strength would otherwise be 3 because the flow changes paid-plan entitlement.
+  strength: 2
+deferred_bindings: 0
+expected_how: 'expected_mode: authored'
+profile_family: unspecified
+surface_state: absent
+technique: Applied Equivalence partitioning to the source-defined eligible account partition (`free` can upgrade, target plan is `pro`). Applied State / flow to the in-dashboard action sequence and Negative / error to the forbidden payment-step promise. No covering array was needed because there were no independent user inputs or roles to combine; the risk-judged interaction strength would otherwise be 3 because the flow changes paid-plan entitlement.

@@ -1,0 +1,9 @@
+anchor: ac-1
+combinatorial:
+  reason: Applied State / flow to the post-upgrade sequence and Persistence / refresh to the reload proof. Applied Equivalence partitioning to keep the source-defined eligible partition (`free`→`pro`) and to defer the unspecified already-`pro` partition to gap-1. No covering array was needed because the use-case exposed no independent input dimensions to combine; the risk-judged interaction strength would otherwise be 3 because the flow changes paid-plan entitlement.
+  strength: 2
+deferred_bindings: 0
+expected_how: 'expected_mode: authored'
+profile_family: unspecified
+surface_state: absent
+technique: Applied State / flow to the post-upgrade sequence and Persistence / refresh to the reload proof. Applied Equivalence partitioning to keep the source-defined eligible partition (`free`→`pro`) and to defer the unspecified already-`pro` partition to gap-1. No covering array was needed because the use-case exposed no independent input dimensions to combine; the risk-judged interaction strength would otherwise be 3 because the flow changes paid-plan entitlement.

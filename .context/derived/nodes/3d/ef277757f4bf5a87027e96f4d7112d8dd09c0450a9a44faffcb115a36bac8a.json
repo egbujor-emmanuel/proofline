@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"A fresh account fetch after a successful upgrade returns plan `pro`, not a cached pre-upgrade value.","kind":"absolute","risk":"high","derived":true,"expected_answer":{"operator":"equals","operand":"pro"}}}

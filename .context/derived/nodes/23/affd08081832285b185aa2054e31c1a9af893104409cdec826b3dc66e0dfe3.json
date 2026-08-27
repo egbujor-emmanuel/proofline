@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"After a successful upgrade, reloading the dashboard shows the plan value as `Pro` from persisted server state.","kind":"absolute","risk":"high","derived":true,"expected_answer":{"operator":"equals","operand":"Pro"}}}

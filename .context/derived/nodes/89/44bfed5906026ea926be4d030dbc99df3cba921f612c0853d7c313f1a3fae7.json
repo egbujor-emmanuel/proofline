@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"After the upgrade is triggered, a success confirmation appears in the same dashboard view.","kind":"presence","risk":"high","derived":true,"expected_answer":{"operator":"exists","operand":"upgrade success confirmation in the dashboard view"}}}

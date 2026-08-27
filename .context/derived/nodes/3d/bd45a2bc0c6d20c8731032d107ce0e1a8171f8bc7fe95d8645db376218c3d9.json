@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"The upgrade flow completes as a direct state change with no payment-processing step.","kind":"forbidden-presence","risk":"high","derived":true,"expected_answer":{"operator":"exists","operand":"payment-processing step in the upgrade flow"}}}
