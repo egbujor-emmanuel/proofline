@@ -96,17 +96,28 @@ function buildReport({ repoRoot, ref, changedFiles, uncoveredFiles, candidates, 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proofline evidence report</title>
 <style>
+  /* Light palette is the base. Dark is redefined twice on purpose: once for
+     viewers on system-dark (who carry no data-theme stamp at all), and once
+     for an explicit data-theme="dark" choice. The prefers-color-scheme block
+     is guarded so an explicit light choice still beats a dark OS. Colors are
+     only ever declared as tokens here -- a color defined solely inside a
+     media or [data-theme] block would not apply in the unstamped state. */
   :root{
     --bg:#f7f7f9; --card:#fff; --ink:#16161a; --dim:#5b5b66; --line:#e3e3e9;
     --good:#0f7b4f; --good-bg:#e6f5ee; --warn:#8a6100; --warn-bg:#fdf3dd;
     --bad:#a32020; --bad-bg:#fceaea; --muted:#5b5b66; --muted-bg:#eeeef2;
   }
   @media (prefers-color-scheme: dark){
-    :root{
+    :root:not([data-theme="light"]){
       --bg:#131317; --card:#1c1c21; --ink:#ececf1; --dim:#a0a0ad; --line:#2e2e37;
       --good:#5fd39b; --good-bg:#12301f; --warn:#e8bf6a; --warn-bg:#332711;
       --bad:#f08b8b; --bad-bg:#331717; --muted:#a0a0ad; --muted-bg:#26262e;
     }
+  }
+  :root[data-theme="dark"]{
+    --bg:#131317; --card:#1c1c21; --ink:#ececf1; --dim:#a0a0ad; --line:#2e2e37;
+    --good:#5fd39b; --good-bg:#12301f; --warn:#e8bf6a; --warn-bg:#332711;
+    --bad:#f08b8b; --bad-bg:#331717; --muted:#a0a0ad; --muted-bg:#26262e;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
