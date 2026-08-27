@@ -8,6 +8,6 @@
   },
   "scripts": {
     "start": "node bin/proofline.js",
-    "test": "node test/evidenceStrength.test.js"
+    "test": "node test/acMap.test.js && node test/evidenceStrength.test.js"
   }
 }
