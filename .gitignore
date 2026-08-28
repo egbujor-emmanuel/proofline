@@ -22,3 +22,7 @@ app/server/db/data.json
 
 # Local machine/session scratch, safe to drop
 *.log
+
+# Proofline's own output artifact -- regenerated every run, and it must
+# not be fed back in as an analyzed "code change".
+proof-report.html

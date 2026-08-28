@@ -8,6 +8,7 @@ const { classify } = require('../src/evidenceStrength');
 const { render } = require('../src/verdict');
 const { checkEnvironment } = require('../src/preflight');
 const { buildReport } = require('../src/report');
+const { checkAppFreshness } = require('../src/staleness');
 const fs = require('fs');
 
 const HELP = `
@@ -26,6 +27,8 @@ Options:
                     (requirements ingested) and live *_test.md files.
   --report <file>  Also write a self-contained HTML evidence report you can
                     open, share, or attach to a pull request.
+  --allow-stale    Verify even if the running app looks older than your
+                    changes. Only use this if you know the app is current.
   --help, -h       Show this help.
 
 Requires: a git repository, kane-cli on PATH and authenticated, and the
@@ -34,7 +37,7 @@ target repo's requirements already run through Kane's assurance lifecycle
 own existing requirements corpus, it does not invent one.
 `.trim();
 
-const KNOWN_FLAGS = new Set(['--dry-run', '--ref', '--repo', '--report', '--help', '-h']);
+const KNOWN_FLAGS = new Set(['--dry-run', '--ref', '--repo', '--report', '--allow-stale', '--help', '-h']);
 const VALUE_FLAGS = new Set(['--ref', '--repo', '--report']);
 
 function parseArgs(argv) {
@@ -51,6 +54,7 @@ function parseArgs(argv) {
   }
 
   const dryRun = argv.includes('--dry-run');
+  const allowStale = argv.includes('--allow-stale');
   const refIdx = argv.indexOf('--ref');
   const ref = refIdx >= 0 ? argv[refIdx + 1] : 'HEAD';
   const repoIdx = argv.indexOf('--repo');
@@ -59,7 +63,7 @@ function parseArgs(argv) {
   const reportPath = reportIdx >= 0 ? path.resolve(argv[reportIdx + 1]) : null;
   const help = argv.includes('--help') || argv.includes('-h');
 
-  return { dryRun, ref, repoRoot, reportPath, help };
+  return { dryRun, ref, repoRoot, reportPath, allowStale, help };
 }
 
 function writeReport(reportPath, data) {
@@ -73,7 +77,7 @@ function writeReport(reportPath, data) {
 }
 
 async function main() {
-  const { dryRun, ref, repoRoot, reportPath, help } = parseArgs(process.argv.slice(2));
+  const { dryRun, ref, repoRoot, reportPath, allowStale, help } = parseArgs(process.argv.slice(2));
 
   if (help) {
     console.log(HELP);
@@ -117,6 +121,32 @@ async function main() {
   if (testFiles.length === 0) {
     console.log('No live Kane tests resolve for the affected ACs:', unresolved.join(', '));
     return;
+  }
+
+  // Guard against verifying a running app that predates the code being
+  // analyzed -- the false-assurance case this tool exists to prevent.
+  //
+  // Only files the mapper actually tied to a requirement are considered.
+  // Checking every changed file made this fire on Proofline's own source
+  // and on the report it had just written, neither of which the app under
+  // test serves -- a false alarm that would train people to pass
+  // --allow-stale reflexively, defeating the guard.
+  const relevantToApp = [...new Set(refined.flatMap((c) => (c.files || []).map((f) => f.path)))];
+  const fresh = checkAppFreshness(repoRoot, relevantToApp);
+  if (fresh.stale === true && !allowStale) {
+    console.log('STALE APP -- refusing to verify.\n');
+    console.log(`  ${fresh.reason}.`);
+    console.log('  These changed files are newer than the running app:');
+    for (const f of fresh.staleFiles) console.log(`    - ${f}`);
+    console.log('\n  Kane would test code that is no longer what you changed, and a PASS');
+    console.log('  would mean nothing. Restart your app server, then run this again.');
+    console.log('\n  (Re-run with --allow-stale if you know the app is already current.)');
+    process.exitCode = 1;
+    return;
+  }
+  if (fresh.stale === null) {
+    console.log(`Note: could not confirm the running app includes your changes (${fresh.reason}).`);
+    console.log('If your app server was started before these edits, restart it first.\n');
   }
 
   console.log(`Running targeted Kane verification for: ${testFiles.map((f) => path.basename(f)).join(', ')}`);
