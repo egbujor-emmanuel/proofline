@@ -28,4 +28,4 @@ if (!src.includes(good)) {
 }
 fs.writeFileSync(file, src.replace(good, broken));
 console.log('Regression introduced: upgradeToPro() no longer persists the plan.');
-console.log('Restart the app server so it picks up the change.');
+console.log('The app server picks this up automatically if you started it with: npm run dev');

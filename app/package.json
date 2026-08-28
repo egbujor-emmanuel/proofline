@@ -4,9 +4,13 @@
   "description": "Small real subscription app used as the Kane/Proofline verification target.",
   "main": "server/index.js",
   "scripts": {
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "dev": "nodemon --watch server --quiet server/index.js"
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

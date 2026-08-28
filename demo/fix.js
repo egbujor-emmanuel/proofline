@@ -26,4 +26,4 @@ if (!src.includes(broken)) {
 }
 fs.writeFileSync(file, src.replace(broken, good));
 console.log('Fixed: upgradeToPro() persists via writeAccount() again.');
-console.log('Restart the app server so it picks up the change.');
+console.log('The app server picks this up automatically if you started it with: npm run dev');
