@@ -22,7 +22,7 @@ Type these two lines, pressing Enter after each:
 
 ```powershell
 cd "C:\Users\Yoma Maroh\proofline\app"
-node server/index.js
+npm run dev
 ```
 
 You should see:
@@ -32,6 +32,11 @@ Subscription dashboard running at http://localhost:4000
 ```
 
 **Leave this window alone from now on.** If you close it, the app stops.
+
+Use `npm run dev`, not `node server/index.js`. `npm run dev` restarts the
+server for you whenever the code changes. With the plain command you would
+have to stop and start it by hand after every edit — and forgetting once
+makes Proofline test code you are no longer running.
 
 > The quotes around the path matter, because `Yoma Maroh` has a space in it.
 > Without quotes Windows reads it as two separate things and errors.
@@ -81,9 +86,7 @@ node ..\demo\break.js
 
 It prints: *Regression introduced: upgradeToPro() no longer persists the plan.*
 
-**Now restart the app** so it picks up the change:
-- Click **Terminal A**, press `Ctrl+C` to stop it
-- Press the **Up arrow** then Enter to run it again
+**Do not touch Terminal A** — it restarts itself. Wait about three seconds.
 
 **See the bug in your browser:** reload http://localhost:4000, click
 **Upgrade to Pro** — it says Pro. Now press **F5**. It says **Free** again.
@@ -147,7 +150,7 @@ VERDICT: BLOCK
 node ..\demo\fix.js
 ```
 
-**Restart the app again** in Terminal A (`Ctrl+C`, Up arrow, Enter).
+Wait about three seconds for the server to restart itself.
 
 Check in the browser: upgrade, press F5, it stays Pro. Fixed.
 
