@@ -107,7 +107,7 @@ async function main() {
   if (dryRun) {
     console.log('DRY RUN -- mapping only, no Kane verification executed (no credits spent).\n');
     console.log(render({ changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc: {}, notYetVerified: true }).text);
-    writeReport(reportPath, { repoRoot, ref, changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc: {}, evidencePath: null, dryRun: true });
+    writeReport(reportPath, { repoRoot, ref, changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc: {}, evidencePath: null, dryRun: true, allAcs });
     return;
   }
 
@@ -139,7 +139,7 @@ async function main() {
   const evidenceByAc = classify(repoRoot, acIds, evidencePath, memberStatus);
   const report = render({ changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc });
   console.log(report.text);
-  writeReport(reportPath, { repoRoot, ref, changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc, evidencePath, dryRun: false });
+  writeReport(reportPath, { repoRoot, ref, changedFiles: files, uncoveredFiles, candidates: refined, evidenceByAc, evidencePath, dryRun: false, allAcs });
 
   // Non-zero exit on BLOCK so this can gate a pre-commit hook or CI step.
   if (report.verdict === 'BLOCK') process.exitCode = 1;

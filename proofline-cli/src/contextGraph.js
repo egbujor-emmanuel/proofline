@@ -2,13 +2,43 @@ const fs = require('fs');
 const path = require('path');
 const { kaneExec } = require('./kaneExec');
 
+/**
+ * Reads the live context graph as NDJSON.
+ *
+ * kane-cli intermittently crashes on exit with a libuv assertion
+ * ("!(handle->flags & UV_HANDLE_CLOSING)") AFTER having already written
+ * complete, valid output -- observed repeatedly on this platform. A
+ * non-zero exit therefore does not imply unusable output, so stdout is
+ * salvaged and parsed either way; only genuinely unparseable output is an
+ * error. Malformed individual lines are skipped rather than aborting the
+ * whole read, since one bad line should not cost the entire graph.
+ */
 function listNodes(repoRoot) {
-  const raw = kaneExec(['context', 'list', '--json'], { cwd: repoRoot });
-  return raw
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => JSON.parse(l));
+  let raw;
+  try {
+    raw = kaneExec(['context', 'list', '--json'], { cwd: repoRoot });
+  } catch (err) {
+    raw = (err.stdout && err.stdout.toString()) || '';
+  }
+
+  const nodes = [];
+  for (const line of raw.split('\n')) {
+    const t = line.trim();
+    if (!t.startsWith('{')) continue;
+    try {
+      nodes.push(JSON.parse(t));
+    } catch {
+      // partial/interleaved line -- skip it, keep the rest of the graph
+    }
+  }
+
+  if (nodes.length === 0) {
+    throw new Error(
+      'Could not read the Kane context graph ("kane-cli context list --json" returned no usable JSON). ' +
+        'Check that kane-cli is authenticated (kane-cli whoami) and that this repo has an ingested requirements graph.'
+    );
+  }
+  return nodes;
 }
 
 function readNode(repoRoot, cid) {

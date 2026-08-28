@@ -7,37 +7,41 @@ const { decide } = require('./verdict');
  * disappears into scrollback; a proof that cannot be shared or archived
  * undercuts the whole point of carrying a requirement to a ship decision.
  *
- * Deliberately shows Kane's RAW signal next to Proofline's interpretation
- * for every criterion, because that separation is the product: the reader
- * must be able to see "Kane reported PASS, Proofline still says review, and
- * here is exactly why" rather than being handed one opaque verdict.
+ * The layout is a ledger, and that is deliberate: every entry states the
+ * PROMISE first (the acceptance criterion in the words the requirements
+ * actually use), then sets Kane's raw observation beside Proofline's
+ * judgment. That pairing is the product -- a reader must be able to see
+ * "Kane reported passed, Proofline still will not call it proven, and here
+ * is exactly why" rather than being handed one opaque verdict.
  *
- * No external assets, no network calls -- the file opens anywhere, offline.
+ * Entries are ordered by the mapper's own ranking, so the criterion most at
+ * risk from this change reads first. No external assets, no network calls,
+ * no scripts -- the file opens anywhere, offline, years from now.
  */
 
 const TONE = {
-  [STATES.MACHINE_VERIFIED_CLEAN]: 'good',
-  [STATES.MACHINE_VERIFIED_HEALED]: 'warn',
-  [STATES.TEST_LINKED_ONLY]: 'warn',
-  [STATES.AGENT_MISSTEP]: 'warn',
-  [STATES.TEST_FAILURE_UNCLASSIFIED]: 'warn',
-  [STATES.NOT_VERIFIED]: 'bad',
-  [STATES.PRODUCT_BUG]: 'bad',
-  [STATES.UNAFFECTED]: 'muted',
+  [STATES.MACHINE_VERIFIED_CLEAN]: 'proven',
+  [STATES.MACHINE_VERIFIED_HEALED]: 'caution',
+  [STATES.TEST_LINKED_ONLY]: 'caution',
+  [STATES.AGENT_MISSTEP]: 'caution',
+  [STATES.TEST_FAILURE_UNCLASSIFIED]: 'caution',
+  [STATES.NOT_VERIFIED]: 'broken',
+  [STATES.PRODUCT_BUG]: 'broken',
+  [STATES.UNAFFECTED]: 'neutral',
 };
 
 const LABEL = {
-  [STATES.MACHINE_VERIFIED_CLEAN]: 'Machine verified',
-  [STATES.MACHINE_VERIFIED_HEALED]: 'Machine verified — healed run',
-  [STATES.TEST_LINKED_ONLY]: 'Test-linked, not independently asserted',
-  [STATES.NOT_VERIFIED]: 'Not verified',
-  [STATES.PRODUCT_BUG]: 'Product bug — requirement broken',
-  [STATES.AGENT_MISSTEP]: 'Review required — test-agent error',
-  [STATES.TEST_FAILURE_UNCLASSIFIED]: 'Review required — unclassified failure',
+  [STATES.MACHINE_VERIFIED_CLEAN]: 'Proven',
+  [STATES.MACHINE_VERIFIED_HEALED]: 'Proven on a healed run',
+  [STATES.TEST_LINKED_ONLY]: 'Not independently asserted',
+  [STATES.NOT_VERIFIED]: 'No evidence',
+  [STATES.PRODUCT_BUG]: 'Requirement broken',
+  [STATES.AGENT_MISSTEP]: 'Verification incomplete',
+  [STATES.TEST_FAILURE_UNCLASSIFIED]: 'Unclassified failure',
   [STATES.UNAFFECTED]: 'Unaffected',
 };
 
-const VERDICT_TONE = { SHIP: 'good', BLOCK: 'bad', 'REVIEW REQUIRED': 'warn' };
+const VERDICT_TONE = { SHIP: 'proven', BLOCK: 'broken', 'REVIEW REQUIRED': 'caution' };
 
 function esc(s) {
   return String(s == null ? '' : s)
@@ -47,46 +51,66 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-function kaneSignalRow(kane) {
-  if (!kane) return '<span class="muted">no Kane execution for this criterion</span>';
-  const bits = [`status: <code>${esc(kane.status || 'unreadable')}</code>`];
-  if (kane.flaky) bits.push('<code class="flag">flaky</code>');
-  if (kane.adaptiveHealTriggered) bits.push('<code class="flag">adaptive_heal: triggered</code>');
-  return bits.join(' &middot; ');
+function kaneObservation(kane) {
+  if (!kane) return '<span class="none">no Kane execution for this criterion</span>';
+  const flags = [];
+  if (kane.flaky) flags.push('<span class="flag">flaky</span>');
+  if (kane.adaptiveHealTriggered) flags.push('<span class="flag">adaptive&nbsp;heal</span>');
+  return `<code class="status status-${esc(kane.status || 'unknown')}">${esc(kane.status || 'unreadable')}</code>${flags.join('')}`;
 }
 
-function buildReport({ repoRoot, ref, changedFiles, uncoveredFiles, candidates, evidenceByAc, evidencePath, dryRun }) {
+function buildReport({ repoRoot, ref, changedFiles, uncoveredFiles, candidates, evidenceByAc, evidencePath, dryRun, allAcs }) {
   const { verdict, reason } = dryRun
-    ? { verdict: 'NOT YET VERIFIED', reason: 'Dry run — mapping only, no Kane execution performed.' }
+    ? { verdict: 'Not yet verified', reason: 'Mapping only — no Kane execution was performed for this report.' }
     : decide(evidenceByAc);
-  const vTone = VERDICT_TONE[verdict] || 'muted';
+  const vTone = dryRun ? 'neutral' : VERDICT_TONE[verdict] || 'neutral';
 
-  const rows = candidates
+  const acText = new Map((allAcs || []).map((a) => [a.id, a.text || '']));
+
+  const entries = candidates
     .map((c) => {
       const ev = evidenceByAc[c.ac] || {};
-      const state = ev.state;
-      const tone = state ? TONE[state] || 'muted' : 'muted';
-      const label = state ? LABEL[state] : 'Pending verification';
-      const files = (c.files || []).map((f) => `<li><code>${esc(f.path)}</code><span class="why">${esc(f.reason)}</span></li>`).join('');
+      const tone = ev.state ? TONE[ev.state] || 'neutral' : 'neutral';
+      const label = ev.state ? LABEL[ev.state] : 'Pending verification';
+      const promise = acText.get(c.ac);
+      const files = (c.files || [])
+        .map((f) => `<li><code>${esc(f.path)}</code><span class="note">${esc(f.reason)}</span></li>`)
+        .join('');
+
       return `
-      <article class="ac ${tone}">
-        <header>
-          <h3>${esc(c.ac.toUpperCase())}</h3>
-          <span class="pill ${tone}">${esc(label)}</span>
-          <span class="conf">mapper confidence: <strong>${esc(c.confidence || 'n/a')}</strong>${c.llm_only ? ' <em>(model-identified)</em>' : ''}</span>
-        </header>
-        ${ev.reason ? `<p class="interp"><span class="tag">Proofline</span>${esc(ev.reason)}</p>` : ''}
-        <p class="raw"><span class="tag">Kane (raw)</span>${kaneSignalRow(ev.kane)}</p>
-        ${c.rationale ? `<p class="rationale"><span class="tag">Why flagged</span>${esc(c.rationale)}</p>` : ''}
+      <article class="entry ${tone}">
+        <div class="entry-head">
+          <span class="acid">${esc(c.ac)}</span>
+          <span class="badge ${tone}">${esc(label)}</span>
+          <span class="risk">at risk: <b>${esc(c.confidence || 'n/a')}</b>${c.llm_only ? ' <span class="note">model-identified</span>' : ''}</span>
+        </div>
+
+        ${promise ? `<p class="promise">${esc(promise)}</p>` : ''}
+
+        <div class="cols">
+          <div class="col">
+            <h4>Kane observed</h4>
+            <p>${kaneObservation(ev.kane)}</p>
+          </div>
+          <div class="col">
+            <h4>Proofline concludes</h4>
+            <p>${ev.reason ? esc(ev.reason) : '<span class="none">not yet evaluated</span>'}</p>
+          </div>
+        </div>
+
+        ${c.rationale ? `<p class="rationale"><span class="k">Flagged because</span> ${esc(c.rationale)}</p>` : ''}
         ${files ? `<ul class="files">${files}</ul>` : ''}
       </article>`;
     })
     .join('');
 
-  const uncovered = uncoveredFiles.length
-    ? `<section><h2>Changed files with no requirement coverage</h2><ul class="files">${uncoveredFiles
-        .map((f) => `<li><code>${esc(f.path)}</code><span class="why">${esc(f.reason)}</span></li>`)
-        .join('')}</ul></section>`
+  const uncovered = uncoveredFiles && uncoveredFiles.length
+    ? `<section>
+         <h2>Changed with no requirement coverage</h2>
+         <ul class="files bare">${uncoveredFiles
+           .map((f) => `<li><code>${esc(f.path)}</code><span class="note">${esc(f.reason)}</span></li>`)
+           .join('')}</ul>
+       </section>`
     : '';
 
   return `<!doctype html>
@@ -95,99 +119,208 @@ function buildReport({ repoRoot, ref, changedFiles, uncoveredFiles, candidates, 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proofline evidence report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
 <style>
-  /* Light palette is the base. Dark is redefined twice on purpose: once for
-     viewers on system-dark (who carry no data-theme stamp at all), and once
-     for an explicit data-theme="dark" choice. The prefers-color-scheme block
-     is guarded so an explicit light choice still beats a dark OS. Colors are
-     only ever declared as tokens here -- a color defined solely inside a
-     media or [data-theme] block would not apply in the unstamped state. */
+  /* Light is the base palette. Dark is redefined twice on purpose: once for
+     viewers on system-dark (who carry no data-theme stamp), guarded so an
+     explicit light choice beats a dark OS, and once for an explicit
+     data-theme="dark". Every colour lives in a token -- a colour declared
+     only inside a media or [data-theme] block would never apply in the
+     unstamped state, which is the classic unreadable-report bug. */
   :root{
-    --bg:#f7f7f9; --card:#fff; --ink:#16161a; --dim:#5b5b66; --line:#e3e3e9;
-    --good:#0f7b4f; --good-bg:#e6f5ee; --warn:#8a6100; --warn-bg:#fdf3dd;
-    --bad:#a32020; --bad-bg:#fceaea; --muted:#5b5b66; --muted-bg:#eeeef2;
+    --bg:#eef1f5; --card:#ffffff; --ink:#10131a; --dim:#5a6273; --faint:#8a92a3;
+    --line:#dde2ea; --rule:#c9d1dd;
+    --accent:#2c4a7c;
+    --proven:#0f6b47; --proven-bg:#e4f2ec; --proven-line:#9ccdb7;
+    --caution:#8a5a00; --caution-bg:#fbf0da; --caution-line:#e0c48a;
+    --broken:#a32a24; --broken-bg:#fbe9e7; --broken-line:#e3aaa5;
+    --neutral:#5a6273; --neutral-bg:#e8ecf2; --neutral-line:#c9d1dd;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#131317; --card:#1c1c21; --ink:#ececf1; --dim:#a0a0ad; --line:#2e2e37;
-      --good:#5fd39b; --good-bg:#12301f; --warn:#e8bf6a; --warn-bg:#332711;
-      --bad:#f08b8b; --bad-bg:#331717; --muted:#a0a0ad; --muted-bg:#26262e;
+      --bg:#0e1116; --card:#161a21; --ink:#e6e9ef; --dim:#9aa3b2; --faint:#6d7686;
+      --line:#242a34; --rule:#333b47;
+      --accent:#8fb0e0;
+      --proven:#5fc79a; --proven-bg:#102a20; --proven-line:#265c45;
+      --caution:#e2b264; --caution-bg:#2b2110; --caution-line:#5e4a1f;
+      --broken:#ef8f88; --broken-bg:#2c1614; --broken-line:#63302c;
+      --neutral:#9aa3b2; --neutral-bg:#1d222a; --neutral-line:#333b47;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#131317; --card:#1c1c21; --ink:#ececf1; --dim:#a0a0ad; --line:#2e2e37;
-    --good:#5fd39b; --good-bg:#12301f; --warn:#e8bf6a; --warn-bg:#332711;
-    --bad:#f08b8b; --bad-bg:#331717; --muted:#a0a0ad; --muted-bg:#26262e;
+    --bg:#0e1116; --card:#161a21; --ink:#e6e9ef; --dim:#9aa3b2; --faint:#6d7686;
+    --line:#242a34; --rule:#333b47;
+    --accent:#8fb0e0;
+    --proven:#5fc79a; --proven-bg:#102a20; --proven-line:#265c45;
+    --caution:#e2b264; --caution-bg:#2b2110; --caution-line:#5e4a1f;
+    --broken:#ef8f88; --broken-bg:#2c1614; --broken-line:#63302c;
+    --neutral:#9aa3b2; --neutral-bg:#1d222a; --neutral-line:#333b47;
   }
+
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
-  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 64px}
-  h1{font-size:20px;margin:0 0 4px}
-  .sub{color:var(--dim);font-size:13px;margin:0 0 24px}
-  .verdict{border-radius:12px;padding:20px 22px;margin:0 0 28px;border:1px solid var(--line)}
-  .verdict h2{margin:0 0 6px;font-size:26px;letter-spacing:-.01em}
-  .verdict p{margin:0;font-size:14px}
-  .verdict.good{background:var(--good-bg);border-color:var(--good)}
-  .verdict.good h2{color:var(--good)}
-  .verdict.warn{background:var(--warn-bg);border-color:var(--warn)}
-  .verdict.warn h2{color:var(--warn)}
-  .verdict.bad{background:var(--bad-bg);border-color:var(--bad)}
-  .verdict.bad h2{color:var(--bad)}
-  .verdict.muted{background:var(--muted-bg)}
-  h2{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin:28px 0 10px}
-  .ac{background:var(--card);border:1px solid var(--line);border-left-width:4px;
-    border-radius:10px;padding:14px 16px;margin:0 0 12px}
-  .ac.good{border-left-color:var(--good)} .ac.warn{border-left-color:var(--warn)}
-  .ac.bad{border-left-color:var(--bad)}   .ac.muted{border-left-color:var(--muted)}
-  .ac header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
-  .ac h3{margin:0;font-size:15px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  .pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px}
-  .pill.good{background:var(--good-bg);color:var(--good)}
-  .pill.warn{background:var(--warn-bg);color:var(--warn)}
-  .pill.bad{background:var(--bad-bg);color:var(--bad)}
-  .pill.muted{background:var(--muted-bg);color:var(--muted)}
-  .conf{margin-left:auto;font-size:12px;color:var(--dim)}
-  .ac p{margin:6px 0;font-size:13.5px}
-  .tag{display:inline-block;min-width:92px;font-size:11px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.05em;color:var(--dim);vertical-align:top}
-  .raw code{background:var(--muted-bg);padding:1px 6px;border-radius:5px;font-size:12px}
-  code.flag{color:var(--warn);font-weight:600}
-  .rationale{color:var(--dim)}
-  .files{list-style:none;margin:8px 0 0;padding:0;border-top:1px solid var(--line);padding-top:8px}
-  .files li{font-size:12.5px;padding:2px 0}
-  .files code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  .why{color:var(--dim);margin-left:8px}
-  .meta{border-top:1px solid var(--line);margin-top:32px;padding-top:14px;
-    font-size:12px;color:var(--dim)}
-  .meta div{margin:3px 0}
-  .meta code{word-break:break-all}
-  .muted{color:var(--dim)}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    font-size:15px; line-height:1.6;
+  }
+  .sheet{max-width:860px; margin:0 auto; padding:40px 22px 72px}
+
+  .masthead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+    padding-bottom:14px; border-bottom:2px solid var(--rule); margin-bottom:26px}
+  .masthead h1{
+    font-family:"IBM Plex Serif",Georgia,serif; font-weight:600;
+    font-size:21px; letter-spacing:-.01em; margin:0;
+  }
+  .masthead .strap{color:var(--dim); font-size:13px; margin:0}
+
+  .verdict{
+    border:1px solid var(--rule); border-left:5px solid var(--neutral);
+    background:var(--card); border-radius:3px; padding:20px 22px; margin-bottom:34px;
+  }
+  .verdict .vlabel{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
+    text-transform:uppercase; letter-spacing:.14em; color:var(--faint); margin:0 0 6px;
+  }
+  .verdict h2{
+    font-family:"IBM Plex Serif",Georgia,serif; font-weight:600;
+    font-size:30px; line-height:1.15; margin:0 0 8px; letter-spacing:-.02em;
+    text-wrap:balance;
+  }
+  .verdict p{margin:0; font-size:14px; color:var(--dim); max-width:62ch}
+  .verdict.proven{border-left-color:var(--proven)}  .verdict.proven h2{color:var(--proven)}
+  .verdict.caution{border-left-color:var(--caution)} .verdict.caution h2{color:var(--caution)}
+  .verdict.broken{border-left-color:var(--broken)}   .verdict.broken h2{color:var(--broken)}
+
+  h2{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
+    text-transform:uppercase; letter-spacing:.14em; color:var(--faint);
+    margin:34px 0 12px; font-weight:500;
+  }
+
+  .entry{
+    background:var(--card); border:1px solid var(--line);
+    border-left:4px solid var(--neutral-line);
+    border-radius:3px; padding:16px 18px; margin-bottom:10px;
+  }
+  .entry.proven{border-left-color:var(--proven)}
+  .entry.caution{border-left-color:var(--caution)}
+  .entry.broken{border-left-color:var(--broken)}
+
+  .entry-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px}
+  .acid{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-weight:500;
+    font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--accent);
+  }
+  .badge{
+    font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:2px;
+    border:1px solid transparent;
+  }
+  .badge.proven{background:var(--proven-bg); color:var(--proven); border-color:var(--proven-line)}
+  .badge.caution{background:var(--caution-bg); color:var(--caution); border-color:var(--caution-line)}
+  .badge.broken{background:var(--broken-bg); color:var(--broken); border-color:var(--broken-line)}
+  .badge.neutral{background:var(--neutral-bg); color:var(--neutral); border-color:var(--neutral-line)}
+  .risk{
+    margin-left:auto; font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11px; color:var(--faint); font-variant-numeric:tabular-nums;
+  }
+  .risk b{color:var(--dim); font-weight:500}
+
+  .promise{
+    font-family:"IBM Plex Serif",Georgia,serif; font-size:15.5px; line-height:1.5;
+    margin:0 0 14px; padding-left:14px; border-left:2px solid var(--line);
+    color:var(--ink); max-width:64ch;
+  }
+
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:4px}
+  @media (max-width:620px){ .cols{grid-template-columns:1fr; gap:12px} }
+  .col h4{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px; font-weight:500;
+    text-transform:uppercase; letter-spacing:.12em; color:var(--faint);
+    margin:0 0 5px; padding-bottom:5px; border-bottom:1px solid var(--line);
+  }
+  .col p{margin:0; font-size:13px; color:var(--dim); line-height:1.55}
+
+  .status{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px;
+    padding:2px 8px; border-radius:2px; background:var(--neutral-bg); color:var(--ink);
+  }
+  .status-passed{background:var(--proven-bg); color:var(--proven)}
+  .status-failed{background:var(--broken-bg); color:var(--broken)}
+  .status-broken{background:var(--caution-bg); color:var(--caution)}
+  .flag{
+    display:inline-block; margin-left:6px; font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--caution); border:1px solid var(--caution-line);
+    background:var(--caution-bg); padding:1px 6px; border-radius:2px;
+  }
+  .none{color:var(--faint); font-style:italic}
+
+  .rationale{
+    margin:12px 0 0; padding-top:10px; border-top:1px solid var(--line);
+    font-size:12.5px; color:var(--dim);
+  }
+  .rationale .k{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px;
+    text-transform:uppercase; letter-spacing:.1em; color:var(--faint); margin-right:6px;
+  }
+
+  .files{list-style:none; margin:10px 0 0; padding:10px 0 0; border-top:1px solid var(--line)}
+  .files.bare{border:0; padding-top:0; margin-top:0}
+  .files li{font-size:12.5px; padding:3px 0; display:flex; gap:10px; flex-wrap:wrap; align-items:baseline}
+  .files code{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px; color:var(--ink)}
+  .note{color:var(--faint); font-size:11.5px}
+
+  .colophon{
+    margin-top:40px; padding-top:16px; border-top:2px solid var(--rule);
+    font-size:12px; color:var(--faint);
+  }
+  .colophon dl{display:grid; grid-template-columns:auto 1fr; gap:4px 16px; margin:0 0 14px}
+  .colophon dt{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px;
+    text-transform:uppercase; letter-spacing:.1em;
+  }
+  .colophon dd{margin:0; font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11.5px; color:var(--dim); word-break:break-all}
+  .colophon .thesis{margin:0; max-width:64ch; font-size:12.5px; line-height:1.6}
 </style>
 </head>
-<body><div class="wrap">
-  <h1>Proofline evidence report</h1>
-  <p class="sub">Which product requirements this change puts at risk, and how strong the evidence is that they still hold.</p>
+<body>
+<div class="sheet">
+
+  <header class="masthead">
+    <h1>Proofline</h1>
+    <p class="strap">evidence report</p>
+  </header>
 
   <div class="verdict ${vTone}">
+    <p class="vlabel">Ship decision</p>
     <h2>${esc(verdict)}</h2>
     <p>${esc(reason)}</p>
   </div>
 
-  <h2>Affected acceptance criteria (${candidates.length})</h2>
-  ${rows || '<p class="muted">No acceptance criteria were mapped to this change.</p>'}
+  <h2>Requirements at risk from this change &mdash; ${candidates.length}</h2>
+  ${entries || '<p class="none">No acceptance criteria were mapped to this change.</p>'}
 
   ${uncovered}
 
-  <div class="meta">
-    <div><strong>Repository:</strong> <code>${esc(repoRoot)}</code></div>
-    <div><strong>Compared against:</strong> <code>${esc(ref)}</code></div>
-    <div><strong>Changed files:</strong> ${changedFiles.length}</div>
-    ${evidencePath ? `<div><strong>Kane evidence pack:</strong> <code>${esc(evidencePath)}</code></div>` : ''}
-    <div><strong>Generated:</strong> ${esc(new Date().toISOString())}</div>
-    <div>Kane executes and produces evidence. Proofline decides which requirements a change threatens and whether that evidence is strong enough to ship on.</div>
+  <div class="colophon">
+    <dl>
+      <dt>Repository</dt><dd>${esc(repoRoot)}</dd>
+      <dt>Compared to</dt><dd>${esc(ref)}</dd>
+      <dt>Files changed</dt><dd>${changedFiles.length}</dd>
+      ${evidencePath ? `<dt>Evidence pack</dt><dd>${esc(evidencePath)}</dd>` : ''}
+      <dt>Generated</dt><dd>${esc(new Date().toISOString())}</dd>
+    </dl>
+    <p class="thesis">Kane executes the tests and produces the evidence. Proofline decides which
+    requirements a code change puts at risk, and whether that evidence is strong enough to ship on.
+    Where the two disagree, both are shown above rather than reconciled into a single number.</p>
   </div>
-</div></body>
+
+</div>
+</body>
 </html>`;
 }
 

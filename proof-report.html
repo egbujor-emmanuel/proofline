@@ -4,163 +4,301 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proofline evidence report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
 <style>
-  /* Light palette is the base. Dark is redefined twice on purpose: once for
-     viewers on system-dark (who carry no data-theme stamp at all), and once
-     for an explicit data-theme="dark" choice. The prefers-color-scheme block
-     is guarded so an explicit light choice still beats a dark OS. Colors are
-     only ever declared as tokens here -- a color defined solely inside a
-     media or [data-theme] block would not apply in the unstamped state. */
+  /* Light is the base palette. Dark is redefined twice on purpose: once for
+     viewers on system-dark (who carry no data-theme stamp), guarded so an
+     explicit light choice beats a dark OS, and once for an explicit
+     data-theme="dark". Every colour lives in a token -- a colour declared
+     only inside a media or [data-theme] block would never apply in the
+     unstamped state, which is the classic unreadable-report bug. */
   :root{
-    --bg:#f7f7f9; --card:#fff; --ink:#16161a; --dim:#5b5b66; --line:#e3e3e9;
-    --good:#0f7b4f; --good-bg:#e6f5ee; --warn:#8a6100; --warn-bg:#fdf3dd;
-    --bad:#a32020; --bad-bg:#fceaea; --muted:#5b5b66; --muted-bg:#eeeef2;
+    --bg:#eef1f5; --card:#ffffff; --ink:#10131a; --dim:#5a6273; --faint:#8a92a3;
+    --line:#dde2ea; --rule:#c9d1dd;
+    --accent:#2c4a7c;
+    --proven:#0f6b47; --proven-bg:#e4f2ec; --proven-line:#9ccdb7;
+    --caution:#8a5a00; --caution-bg:#fbf0da; --caution-line:#e0c48a;
+    --broken:#a32a24; --broken-bg:#fbe9e7; --broken-line:#e3aaa5;
+    --neutral:#5a6273; --neutral-bg:#e8ecf2; --neutral-line:#c9d1dd;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#131317; --card:#1c1c21; --ink:#ececf1; --dim:#a0a0ad; --line:#2e2e37;
-      --good:#5fd39b; --good-bg:#12301f; --warn:#e8bf6a; --warn-bg:#332711;
-      --bad:#f08b8b; --bad-bg:#331717; --muted:#a0a0ad; --muted-bg:#26262e;
+      --bg:#0e1116; --card:#161a21; --ink:#e6e9ef; --dim:#9aa3b2; --faint:#6d7686;
+      --line:#242a34; --rule:#333b47;
+      --accent:#8fb0e0;
+      --proven:#5fc79a; --proven-bg:#102a20; --proven-line:#265c45;
+      --caution:#e2b264; --caution-bg:#2b2110; --caution-line:#5e4a1f;
+      --broken:#ef8f88; --broken-bg:#2c1614; --broken-line:#63302c;
+      --neutral:#9aa3b2; --neutral-bg:#1d222a; --neutral-line:#333b47;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#131317; --card:#1c1c21; --ink:#ececf1; --dim:#a0a0ad; --line:#2e2e37;
-    --good:#5fd39b; --good-bg:#12301f; --warn:#e8bf6a; --warn-bg:#332711;
-    --bad:#f08b8b; --bad-bg:#331717; --muted:#a0a0ad; --muted-bg:#26262e;
+    --bg:#0e1116; --card:#161a21; --ink:#e6e9ef; --dim:#9aa3b2; --faint:#6d7686;
+    --line:#242a34; --rule:#333b47;
+    --accent:#8fb0e0;
+    --proven:#5fc79a; --proven-bg:#102a20; --proven-line:#265c45;
+    --caution:#e2b264; --caution-bg:#2b2110; --caution-line:#5e4a1f;
+    --broken:#ef8f88; --broken-bg:#2c1614; --broken-line:#63302c;
+    --neutral:#9aa3b2; --neutral-bg:#1d222a; --neutral-line:#333b47;
   }
+
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
-  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 64px}
-  h1{font-size:20px;margin:0 0 4px}
-  .sub{color:var(--dim);font-size:13px;margin:0 0 24px}
-  .verdict{border-radius:12px;padding:20px 22px;margin:0 0 28px;border:1px solid var(--line)}
-  .verdict h2{margin:0 0 6px;font-size:26px;letter-spacing:-.01em}
-  .verdict p{margin:0;font-size:14px}
-  .verdict.good{background:var(--good-bg);border-color:var(--good)}
-  .verdict.good h2{color:var(--good)}
-  .verdict.warn{background:var(--warn-bg);border-color:var(--warn)}
-  .verdict.warn h2{color:var(--warn)}
-  .verdict.bad{background:var(--bad-bg);border-color:var(--bad)}
-  .verdict.bad h2{color:var(--bad)}
-  .verdict.muted{background:var(--muted-bg)}
-  h2{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin:28px 0 10px}
-  .ac{background:var(--card);border:1px solid var(--line);border-left-width:4px;
-    border-radius:10px;padding:14px 16px;margin:0 0 12px}
-  .ac.good{border-left-color:var(--good)} .ac.warn{border-left-color:var(--warn)}
-  .ac.bad{border-left-color:var(--bad)}   .ac.muted{border-left-color:var(--muted)}
-  .ac header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
-  .ac h3{margin:0;font-size:15px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  .pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px}
-  .pill.good{background:var(--good-bg);color:var(--good)}
-  .pill.warn{background:var(--warn-bg);color:var(--warn)}
-  .pill.bad{background:var(--bad-bg);color:var(--bad)}
-  .pill.muted{background:var(--muted-bg);color:var(--muted)}
-  .conf{margin-left:auto;font-size:12px;color:var(--dim)}
-  .ac p{margin:6px 0;font-size:13.5px}
-  .tag{display:inline-block;min-width:92px;font-size:11px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.05em;color:var(--dim);vertical-align:top}
-  .raw code{background:var(--muted-bg);padding:1px 6px;border-radius:5px;font-size:12px}
-  code.flag{color:var(--warn);font-weight:600}
-  .rationale{color:var(--dim)}
-  .files{list-style:none;margin:8px 0 0;padding:0;border-top:1px solid var(--line);padding-top:8px}
-  .files li{font-size:12.5px;padding:2px 0}
-  .files code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  .why{color:var(--dim);margin-left:8px}
-  .meta{border-top:1px solid var(--line);margin-top:32px;padding-top:14px;
-    font-size:12px;color:var(--dim)}
-  .meta div{margin:3px 0}
-  .meta code{word-break:break-all}
-  .muted{color:var(--dim)}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    font-size:15px; line-height:1.6;
+  }
+  .sheet{max-width:860px; margin:0 auto; padding:40px 22px 72px}
+
+  .masthead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+    padding-bottom:14px; border-bottom:2px solid var(--rule); margin-bottom:26px}
+  .masthead h1{
+    font-family:"IBM Plex Serif",Georgia,serif; font-weight:600;
+    font-size:21px; letter-spacing:-.01em; margin:0;
+  }
+  .masthead .strap{color:var(--dim); font-size:13px; margin:0}
+
+  .verdict{
+    border:1px solid var(--rule); border-left:5px solid var(--neutral);
+    background:var(--card); border-radius:3px; padding:20px 22px; margin-bottom:34px;
+  }
+  .verdict .vlabel{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
+    text-transform:uppercase; letter-spacing:.14em; color:var(--faint); margin:0 0 6px;
+  }
+  .verdict h2{
+    font-family:"IBM Plex Serif",Georgia,serif; font-weight:600;
+    font-size:30px; line-height:1.15; margin:0 0 8px; letter-spacing:-.02em;
+    text-wrap:balance;
+  }
+  .verdict p{margin:0; font-size:14px; color:var(--dim); max-width:62ch}
+  .verdict.proven{border-left-color:var(--proven)}  .verdict.proven h2{color:var(--proven)}
+  .verdict.caution{border-left-color:var(--caution)} .verdict.caution h2{color:var(--caution)}
+  .verdict.broken{border-left-color:var(--broken)}   .verdict.broken h2{color:var(--broken)}
+
+  h2{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
+    text-transform:uppercase; letter-spacing:.14em; color:var(--faint);
+    margin:34px 0 12px; font-weight:500;
+  }
+
+  .entry{
+    background:var(--card); border:1px solid var(--line);
+    border-left:4px solid var(--neutral-line);
+    border-radius:3px; padding:16px 18px; margin-bottom:10px;
+  }
+  .entry.proven{border-left-color:var(--proven)}
+  .entry.caution{border-left-color:var(--caution)}
+  .entry.broken{border-left-color:var(--broken)}
+
+  .entry-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px}
+  .acid{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-weight:500;
+    font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--accent);
+  }
+  .badge{
+    font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:2px;
+    border:1px solid transparent;
+  }
+  .badge.proven{background:var(--proven-bg); color:var(--proven); border-color:var(--proven-line)}
+  .badge.caution{background:var(--caution-bg); color:var(--caution); border-color:var(--caution-line)}
+  .badge.broken{background:var(--broken-bg); color:var(--broken); border-color:var(--broken-line)}
+  .badge.neutral{background:var(--neutral-bg); color:var(--neutral); border-color:var(--neutral-line)}
+  .risk{
+    margin-left:auto; font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11px; color:var(--faint); font-variant-numeric:tabular-nums;
+  }
+  .risk b{color:var(--dim); font-weight:500}
+
+  .promise{
+    font-family:"IBM Plex Serif",Georgia,serif; font-size:15.5px; line-height:1.5;
+    margin:0 0 14px; padding-left:14px; border-left:2px solid var(--line);
+    color:var(--ink); max-width:64ch;
+  }
+
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:4px}
+  @media (max-width:620px){ .cols{grid-template-columns:1fr; gap:12px} }
+  .col h4{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px; font-weight:500;
+    text-transform:uppercase; letter-spacing:.12em; color:var(--faint);
+    margin:0 0 5px; padding-bottom:5px; border-bottom:1px solid var(--line);
+  }
+  .col p{margin:0; font-size:13px; color:var(--dim); line-height:1.55}
+
+  .status{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px;
+    padding:2px 8px; border-radius:2px; background:var(--neutral-bg); color:var(--ink);
+  }
+  .status-passed{background:var(--proven-bg); color:var(--proven)}
+  .status-failed{background:var(--broken-bg); color:var(--broken)}
+  .status-broken{background:var(--caution-bg); color:var(--caution)}
+  .flag{
+    display:inline-block; margin-left:6px; font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--caution); border:1px solid var(--caution-line);
+    background:var(--caution-bg); padding:1px 6px; border-radius:2px;
+  }
+  .none{color:var(--faint); font-style:italic}
+
+  .rationale{
+    margin:12px 0 0; padding-top:10px; border-top:1px solid var(--line);
+    font-size:12.5px; color:var(--dim);
+  }
+  .rationale .k{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px;
+    text-transform:uppercase; letter-spacing:.1em; color:var(--faint); margin-right:6px;
+  }
+
+  .files{list-style:none; margin:10px 0 0; padding:10px 0 0; border-top:1px solid var(--line)}
+  .files.bare{border:0; padding-top:0; margin-top:0}
+  .files li{font-size:12.5px; padding:3px 0; display:flex; gap:10px; flex-wrap:wrap; align-items:baseline}
+  .files code{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px; color:var(--ink)}
+  .note{color:var(--faint); font-size:11.5px}
+
+  .colophon{
+    margin-top:40px; padding-top:16px; border-top:2px solid var(--rule);
+    font-size:12px; color:var(--faint);
+  }
+  .colophon dl{display:grid; grid-template-columns:auto 1fr; gap:4px 16px; margin:0 0 14px}
+  .colophon dt{
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px;
+    text-transform:uppercase; letter-spacing:.1em;
+  }
+  .colophon dd{margin:0; font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11.5px; color:var(--dim); word-break:break-all}
+  .colophon .thesis{margin:0; max-width:64ch; font-size:12.5px; line-height:1.6}
 </style>
 </head>
-<body><div class="wrap">
-  <h1>Proofline evidence report</h1>
-  <p class="sub">Which product requirements this change puts at risk, and how strong the evidence is that they still hold.</p>
+<body>
+<div class="sheet">
 
-  <div class="verdict warn">
+  <header class="masthead">
+    <h1>Proofline</h1>
+    <p class="strap">evidence report</p>
+  </header>
+
+  <div class="verdict caution">
+    <p class="vlabel">Ship decision</p>
     <h2>REVIEW REQUIRED</h2>
     <p>At least one affected AC is only test-linked, not independently machine-asserted -- Kane's evidence for it is weaker than a direct check.</p>
   </div>
 
-  <h2>Affected acceptance criteria (6)</h2>
+  <h2>Requirements at risk from this change &mdash; 4</h2>
   
-      <article class="ac good">
-        <header>
-          <h3>AC-1</h3>
-          <span class="pill good">Machine verified</span>
-          <span class="conf">mapper confidence: <strong>medium</strong></span>
-        </header>
-        <p class="interp"><span class="tag">Proofline</span>Kane reported PASS for &quot;Fresh fetch and reload show the upgraded Pro plan&quot;'s explicit runtime check (state-transition: equals pro) targeting exactly this AC, on a clean (non-flaky, non-healed) execution.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>The diff adds PRD/context artifacts asserting AC-01.1 (persisted plan becomes `pro` after upgrade) as a derived use-case criterion, so the specification governing this AC is introduced/changed here, though no application code is touched.</p>
-        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [free(1.79), pro(0.41)], score 2.20</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [account(1.10), free(1.79), pro(0.41), upgrade(0.00)], score 3.30</span></li><li><code>proof-report.html</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
+      <article class="entry proven">
+        <div class="entry-head">
+          <span class="acid">ac-1</span>
+          <span class="badge proven">Proven</span>
+          <span class="risk">at risk: <b>high</b></span>
+        </div>
+
+        <p class="promise">After a successful upgrade request, the account's persisted plan changes from `free` to `pro`.</p>
+
+        <div class="cols">
+          <div class="col">
+            <h4>Kane observed</h4>
+            <p><code class="status status-passed">passed</code></p>
+          </div>
+          <div class="col">
+            <h4>Proofline concludes</h4>
+            <p>Kane reported PASS for &quot;Fresh fetch and reload show the upgraded Pro plan&quot;'s explicit runtime check (state-transition: equals pro) targeting exactly this AC, on a clean (non-flaky, non-healed) execution.</p>
+          </div>
+        </div>
+
+        <p class="rationale"><span class="k">Flagged because</span> Structurally flagged, but claude CLI did not rank it -- kept, unrefined, rather than silently dropped.</p>
+        <ul class="files"><li><code>README.md</code><span class="note">discriminating term overlap [free(1.79), pro(0.41)], score 2.20</span></li><li><code>app/server/services/subscriptionService.js</code><span class="note">discriminating term overlap [account(1.10), free(1.79), pro(0.41), upgrade(0.00)], score 3.30</span></li><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
       </article>
-      <article class="ac warn">
-        <header>
-          <h3>AC-2</h3>
-          <span class="pill warn">Test-linked, not independently asserted</span>
-          <span class="conf">mapper confidence: <strong>medium</strong></span>
-        </header>
-        <p class="interp"><span class="tag">Proofline</span>Test &quot;Fresh fetch and reload show the upgraded Pro plan&quot; claims to verify this AC (@verifies ac-1, ac-2, ac-6), but its explicit runtime check targets ac-1 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>The added PRD text and derived usecase node explicitly restate the fresh-fetch-not-cached requirement, so this AC's source of truth is defined by the diff.</p>
-        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [account(1.10), pro(0.41), upgrade(0.00)], score 1.50</span></li><li><code>proof-report.html</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
+      <article class="entry caution">
+        <div class="entry-head">
+          <span class="acid">ac-2</span>
+          <span class="badge caution">Not independently asserted</span>
+          <span class="risk">at risk: <b>high</b></span>
+        </div>
+
+        <p class="promise">A fresh account fetch after a successful upgrade returns plan `pro`, not a cached pre-upgrade value.</p>
+
+        <div class="cols">
+          <div class="col">
+            <h4>Kane observed</h4>
+            <p><code class="status status-passed">passed</code></p>
+          </div>
+          <div class="col">
+            <h4>Proofline concludes</h4>
+            <p>Test &quot;Fresh fetch and reload show the upgraded Pro plan&quot; claims to verify this AC (@verifies ac-1, ac-2, ac-6), but its explicit runtime check targets ac-1 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
+          </div>
+        </div>
+
+        <p class="rationale"><span class="k">Flagged because</span> Structurally flagged, but claude CLI did not rank it -- kept, unrefined, rather than silently dropped.</p>
+        <ul class="files"><li><code>README.md</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="note">discriminating term overlap [account(1.10), pro(0.41), upgrade(0.00)], score 1.50</span></li><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
       </article>
-      <article class="ac warn">
-        <header>
-          <h3>AC-6</h3>
-          <span class="pill warn">Test-linked, not independently asserted</span>
-          <span class="conf">mapper confidence: <strong>medium</strong></span>
-        </header>
-        <p class="interp"><span class="tag">Proofline</span>Test &quot;Fresh fetch and reload show the upgraded Pro plan&quot; claims to verify this AC (@verifies ac-1, ac-2, ac-6), but its explicit runtime check targets ac-1 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>AC-02.2 in the added PRD and the 'View the current subscription plan on the dashboard' usecase require the reloaded dashboard to show persisted `Pro`, matching this AC.</p>
-        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>proof-report.html</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
+      <article class="entry caution">
+        <div class="entry-head">
+          <span class="acid">ac-6</span>
+          <span class="badge caution">Not independently asserted</span>
+          <span class="risk">at risk: <b>high</b></span>
+        </div>
+
+        <p class="promise">After a successful upgrade, reloading the dashboard shows the plan value as `Pro` from persisted server state.</p>
+
+        <div class="cols">
+          <div class="col">
+            <h4>Kane observed</h4>
+            <p><code class="status status-passed">passed</code></p>
+          </div>
+          <div class="col">
+            <h4>Proofline concludes</h4>
+            <p>Test &quot;Fresh fetch and reload show the upgraded Pro plan&quot; claims to verify this AC (@verifies ac-1, ac-2, ac-6), but its explicit runtime check targets ac-1 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
+          </div>
+        </div>
+
+        <p class="rationale"><span class="k">Flagged because</span> Structurally flagged, but claude CLI did not rank it -- kept, unrefined, rather than silently dropped.</p>
+        <ul class="files"><li><code>README.md</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="note">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
       </article>
-      <article class="ac good">
-        <header>
-          <h3>AC-3</h3>
-          <span class="pill good">Machine verified</span>
-          <span class="conf">mapper confidence: <strong>medium</strong></span>
-        </header>
-        <p class="interp"><span class="tag">Proofline</span>Kane reported PASS for &quot;Dashboard upgrade stays in place and shows success without payment&quot;'s explicit runtime check (forbidden-presence: exists full page navigation away from the dashboard during the upgrade action) targeting exactly this AC, on a clean (non-flaky, non-healed) execution.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>AC-01.2 in the new PRD blob and the 'triggers the upgrade without full page navigation' criterion in the extracted usecase directly encode this AC.</p>
-        <ul class="files"><li><code>README.md</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="why">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>proof-report.html</code><span class="why">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
-      </article>
-      <article class="ac warn">
-        <header>
-          <h3>AC-4</h3>
-          <span class="pill warn">Test-linked, not independently asserted</span>
-          <span class="conf">mapper confidence: <strong>medium</strong> <em>(model-identified)</em></span>
-        </header>
-        <p class="interp"><span class="tag">Proofline</span>Test &quot;Dashboard upgrade stays in place and shows success without payment&quot; claims to verify this AC (@verifies ac-3, ac-4, ac-5), but its explicit runtime check targets ac-3 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>The same AC-01.2 clause added by the diff requires the success confirmation to appear in the same view, so this AC is covered by the introduced spec. (Identified by claude CLI; not structurally flagged by term overlap.)</p>
-        
-      </article>
-      <article class="ac warn">
-        <header>
-          <h3>AC-5</h3>
-          <span class="pill warn">Test-linked, not independently asserted</span>
-          <span class="conf">mapper confidence: <strong>medium</strong> <em>(model-identified)</em></span>
-        </header>
-        <p class="interp"><span class="tag">Proofline</span>Test &quot;Dashboard upgrade stays in place and shows success without payment&quot; claims to verify this AC (@verifies ac-3, ac-4, ac-5), but its explicit runtime check targets ac-3 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
-        <p class="raw"><span class="tag">Kane (raw)</span>status: <code>passed</code></p>
-        <p class="rationale"><span class="tag">Why flagged</span>The new 'Out of scope' section and the usecase criterion 'upgrade is a direct state change with no payment step' define this AC verbatim. (Identified by claude CLI; not structurally flagged by term overlap.)</p>
-        
+      <article class="entry proven">
+        <div class="entry-head">
+          <span class="acid">ac-3</span>
+          <span class="badge proven">Proven</span>
+          <span class="risk">at risk: <b>high</b></span>
+        </div>
+
+        <p class="promise">Clicking the &quot;Upgrade to Pro&quot; button triggers the upgrade without a full page navigation.</p>
+
+        <div class="cols">
+          <div class="col">
+            <h4>Kane observed</h4>
+            <p><code class="status status-passed">passed</code></p>
+          </div>
+          <div class="col">
+            <h4>Proofline concludes</h4>
+            <p>Kane reported PASS for &quot;Dashboard upgrade stays in place and shows success without payment&quot;'s explicit runtime check (forbidden-presence: exists full page navigation away from the dashboard during the upgrade action) targeting exactly this AC, on a clean (non-flaky, non-healed) execution.</p>
+          </div>
+        </div>
+
+        <p class="rationale"><span class="k">Flagged because</span> Structurally flagged, but claude CLI did not rank it -- kept, unrefined, rather than silently dropped.</p>
+        <ul class="files"><li><code>README.md</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="note">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
       </article>
 
-  <section><h2>Changed files with no requirement coverage</h2><ul class="files"><li><code>.gitignore</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/bin/proofline.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/make-artifact.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/package.json</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/git.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmProvider.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmRank.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/report.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/test/llmRank.test.js</code><span class="why">no discriminating term overlap between this file's extracted signals and any live AC text</span></li></ul></section>
+  <section>
+         <h2>Changed with no requirement coverage</h2>
+         <ul class="files bare"><li><code>.gitignore</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/bin/proofline.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/make-artifact.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/package.json</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/contextGraph.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/git.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmProvider.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmRank.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/report.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/test/llmRank.test.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li></ul>
+       </section>
 
-  <div class="meta">
-    <div><strong>Repository:</strong> <code>C:\Users\Yoma Maroh\proofline</code></div>
-    <div><strong>Compared against:</strong> <code>HEAD~7</code></div>
-    <div><strong>Changed files:</strong> 12</div>
-    <div><strong>Kane evidence pack:</strong> <code>C:\Users\Yoma Maroh\proofline\.testmuai\evidence\a492cabd-0e49-499c-a59a-3ad931c007de.evidence</code></div>
-    <div><strong>Generated:</strong> 2026-08-27T16:31:38.842Z</div>
-    <div>Kane executes and produces evidence. Proofline decides which requirements a change threatens and whether that evidence is strong enough to ship on.</div>
+  <div class="colophon">
+    <dl>
+      <dt>Repository</dt><dd>C:\Users\Yoma Maroh\proofline</dd>
+      <dt>Compared to</dt><dd>HEAD~9</dd>
+      <dt>Files changed</dt><dd>13</dd>
+      <dt>Evidence pack</dt><dd>C:\Users\Yoma Maroh\proofline\.testmuai\evidence\a2ebcf56-5224-4006-aa55-be7e375f8217.evidence</dd>
+      <dt>Generated</dt><dd>2026-08-28T06:37:23.357Z</dd>
+    </dl>
+    <p class="thesis">Kane executes the tests and produces the evidence. Proofline decides which
+    requirements a code change puts at risk, and whether that evidence is strong enough to ship on.
+    Where the two disagree, both are shown above rather than reconciled into a single number.</p>
   </div>
-</div></body>
+
+</div>
+</body>
 </html>
