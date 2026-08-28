@@ -204,6 +204,14 @@ never really checks them. Proofline will not call those proven. That is
 deliberate, and it is the product's main argument. AC-1 going red then green
 is the story; the ambers are the point.
 
+**"EADDRINUSE: address already in use :::4000"**
+Something is already using port 4000 - usually a server left over from an
+earlier attempt. Free it, then start again:
+
+```powershell
+.\demoree-port.ps1
+```
+
 **"A Chrome window keeps appearing"**
 That is Kane. It is meant to.
 
