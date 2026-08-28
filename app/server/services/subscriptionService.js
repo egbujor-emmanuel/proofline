@@ -15,8 +15,8 @@ function isPro() {
 
 function upgradeToPro() {
   const account = readAccount();
-  account.plan = 'pro';
-  return writeAccount(account);
+  const upgraded = { ...account, plan: 'pro' };
+  return upgraded;
 }
 
 function resetToFree() {
