@@ -186,7 +186,7 @@
     <p>At least one affected AC is only test-linked, not independently machine-asserted -- Kane's evidence for it is weaker than a direct check.</p>
   </div>
 
-  <h2>Requirements at risk from this change &mdash; 4</h2>
+  <h2>Requirements at risk from this change &mdash; 5</h2>
   
       <article class="entry proven">
         <div class="entry-head">
@@ -208,31 +208,8 @@
           </div>
         </div>
 
-        <p class="rationale"><span class="k">Flagged because</span> Structurally flagged, but claude CLI did not rank it -- kept, unrefined, rather than silently dropped.</p>
-        <ul class="files"><li><code>README.md</code><span class="note">discriminating term overlap [free(1.79), pro(0.41)], score 2.20</span></li><li><code>app/server/services/subscriptionService.js</code><span class="note">discriminating term overlap [account(1.10), free(1.79), pro(0.41), upgrade(0.00)], score 3.30</span></li><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
-      </article>
-      <article class="entry caution">
-        <div class="entry-head">
-          <span class="acid">ac-2</span>
-          <span class="badge caution">Not independently asserted</span>
-          <span class="risk">at risk: <b>high</b></span>
-        </div>
-
-        <p class="promise">A fresh account fetch after a successful upgrade returns plan `pro`, not a cached pre-upgrade value.</p>
-
-        <div class="cols">
-          <div class="col">
-            <h4>Kane observed</h4>
-            <p><code class="status status-passed">passed</code></p>
-          </div>
-          <div class="col">
-            <h4>Proofline concludes</h4>
-            <p>Test &quot;Fresh fetch and reload show the upgraded Pro plan&quot; claims to verify this AC (@verifies ac-1, ac-2, ac-6), but its explicit runtime check targets ac-1 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
-          </div>
-        </div>
-
-        <p class="rationale"><span class="k">Flagged because</span> Structurally flagged, but claude CLI did not rank it -- kept, unrefined, rather than silently dropped.</p>
-        <ul class="files"><li><code>README.md</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="note">discriminating term overlap [account(1.10), pro(0.41), upgrade(0.00)], score 1.50</span></li><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
+        <p class="rationale"><span class="k">Flagged because</span> The diff's own rationale states the change removes the writeAccount(account) persistence call from upgradeToPro, so the persisted plan never changes from `free` to `pro`.</p>
+        <ul class="files"><li><code>proof-report.html</code><span class="note">discriminating term overlap [free(1.79), pro(0.41)], score 2.20</span></li><li><code>demo/break.js</code><span class="note">discriminating term overlap [free(1.79), plan(0.69), pro(0.41), upgrade(0.00)], score 2.89</span></li><li><code>demo/fix.js</code><span class="note">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li></ul>
       </article>
       <article class="entry caution">
         <div class="entry-head">
@@ -254,14 +231,37 @@
           </div>
         </div>
 
-        <p class="rationale"><span class="k">Flagged because</span> Structurally flagged, but claude CLI did not rank it -- kept, unrefined, rather than silently dropped.</p>
-        <ul class="files"><li><code>README.md</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="note">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
+        <p class="rationale"><span class="k">Flagged because</span> The diff notes reloading the dashboard reads persisted server state that upgradeToPro no longer updates, so the plan renders as `Free` instead of `Pro`.</p>
+        <ul class="files"><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>demo/break.js</code><span class="note">discriminating term overlap [plan(0.69), pro(0.41), server(1.79), upgrade(0.00)], score 2.89</span></li><li><code>demo/fix.js</code><span class="note">discriminating term overlap [pro(0.41), server(1.79), upgrade(0.00)], score 2.20</span></li></ul>
+      </article>
+      <article class="entry caution">
+        <div class="entry-head">
+          <span class="acid">ac-2</span>
+          <span class="badge caution">Not independently asserted</span>
+          <span class="risk">at risk: <b>high</b></span>
+        </div>
+
+        <p class="promise">A fresh account fetch after a successful upgrade returns plan `pro`, not a cached pre-upgrade value.</p>
+
+        <div class="cols">
+          <div class="col">
+            <h4>Kane observed</h4>
+            <p><code class="status status-passed">passed</code></p>
+          </div>
+          <div class="col">
+            <h4>Proofline concludes</h4>
+            <p>Test &quot;Fresh fetch and reload show the upgraded Pro plan&quot; claims to verify this AC (@verifies ac-1, ac-2, ac-6), but its explicit runtime check targets ac-1 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
+          </div>
+        </div>
+
+        <p class="rationale"><span class="k">Flagged because</span> With the persistence write dropped in subscriptionService.js, a fresh account fetch after upgrade reads back the unchanged stored `free` plan rather than `pro`.</p>
+        <ul class="files"><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>demo/break.js</code><span class="note">discriminating term overlap [plan(0.69), pro(0.41), upgrade(0.00)], score 1.10</span></li><li><code>demo/fix.js</code><span class="note">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li></ul>
       </article>
       <article class="entry proven">
         <div class="entry-head">
           <span class="acid">ac-3</span>
           <span class="badge proven">Proven</span>
-          <span class="risk">at risk: <b>high</b></span>
+          <span class="risk">at risk: <b>low</b></span>
         </div>
 
         <p class="promise">Clicking the &quot;Upgrade to Pro&quot; button triggers the upgrade without a full page navigation.</p>
@@ -278,21 +278,41 @@
         </div>
 
         <p class="rationale"><span class="k">Flagged because</span> Structurally flagged, but claude CLI did not rank it -- kept, unrefined, rather than silently dropped.</p>
-        <ul class="files"><li><code>README.md</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>app/server/services/subscriptionService.js</code><span class="note">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li></ul>
+        <ul class="files"><li><code>proof-report.html</code><span class="note">discriminating term overlap [pro(0.41)], score 0.41</span></li><li><code>demo/break.js</code><span class="note">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li><li><code>demo/fix.js</code><span class="note">discriminating term overlap [pro(0.41), upgrade(0.00)], score 0.41</span></li></ul>
+      </article>
+      <article class="entry caution">
+        <div class="entry-head">
+          <span class="acid">ac-4</span>
+          <span class="badge caution">Not independently asserted</span>
+          <span class="risk">at risk: <b>low</b> <span class="note">model-identified</span></span>
+        </div>
+
+        <p class="promise">After the upgrade is triggered, a success confirmation appears in the same dashboard view.</p>
+
+        <div class="cols">
+          <div class="col">
+            <h4>Kane observed</h4>
+            <p><code class="status status-passed">passed</code></p>
+          </div>
+          <div class="col">
+            <h4>Proofline concludes</h4>
+            <p>Test &quot;Dashboard upgrade stays in place and shows success without payment&quot; claims to verify this AC (@verifies ac-3, ac-4, ac-5), but its explicit runtime check targets ac-3 instead. Kane's own coverage counts this AC as &quot;proven&quot; alongside it -- confirmed identical under both strict and lenient rollup -- but there is no independent assertion for this specific AC.</p>
+          </div>
+        </div>
+
+        <p class="rationale"><span class="k">Flagged because</span> The upgrade request still returns successfully (only the persistence write is dropped), so the in-view success confirmation is likely unaffected, but a changed upgradeToPro return path could plausibly alter it. (Identified by claude CLI; not structurally flagged by term overlap.)</p>
+        
       </article>
 
-  <section>
-         <h2>Changed with no requirement coverage</h2>
-         <ul class="files bare"><li><code>.gitignore</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/bin/proofline.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/make-artifact.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/package.json</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/contextGraph.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/git.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmProvider.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/llmRank.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/src/report.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li><li><code>proofline-cli/test/llmRank.test.js</code><span class="note">no discriminating term overlap between this file's extracted signals and any live AC text</span></li></ul>
-       </section>
+  
 
   <div class="colophon">
     <dl>
       <dt>Repository</dt><dd>C:\Users\Yoma Maroh\proofline</dd>
-      <dt>Compared to</dt><dd>HEAD~9</dd>
-      <dt>Files changed</dt><dd>13</dd>
-      <dt>Evidence pack</dt><dd>C:\Users\Yoma Maroh\proofline\.testmuai\evidence\a2ebcf56-5224-4006-aa55-be7e375f8217.evidence</dd>
-      <dt>Generated</dt><dd>2026-08-28T06:37:23.357Z</dd>
+      <dt>Compared to</dt><dd>HEAD</dd>
+      <dt>Files changed</dt><dd>3</dd>
+      <dt>Evidence pack</dt><dd>C:\Users\Yoma Maroh\proofline\.testmuai\evidence\ff24036b-6c93-4538-82b8-07525bda5d20.evidence</dd>
+      <dt>Generated</dt><dd>2026-08-28T11:32:44.427Z</dd>
     </dl>
     <p class="thesis">Kane executes the tests and produces the evidence. Proofline decides which
     requirements a code change puts at risk, and whether that evidence is strong enough to ship on.
