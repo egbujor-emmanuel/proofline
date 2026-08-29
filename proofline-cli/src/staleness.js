@@ -42,6 +42,43 @@ function portFromUrl(url) {
   return m ? Number(m[1]) : null;
 }
 
+/**
+ * Is the app under test actually answering?
+ *
+ * Learned the hard way. The app server had died on startup (EADDRINUSE from
+ * a leftover process), and every subsequent run reported "test-agent error"
+ * on every criterion, because Kane was faithfully driving a browser at a
+ * URL that served nothing. Hours went into suspecting Kane's reliability,
+ * the CLI version, and the shims -- when the real cause was that there was
+ * no app to test. Verification against a dead app is meaningless, so it is
+ * refused rather than reported as an inconclusive Kane result.
+ */
+function checkAppReachable(repoRoot) {
+  const url = startUrlFor(repoRoot);
+  if (!url) return { reachable: null, url: null, reason: 'no start_url configured' };
+
+  const ps = `
+    try {
+      $r = Invoke-WebRequest -Uri '${String(url).replace(/'/g, "''")}' -TimeoutSec 8 -UseBasicParsing -ErrorAction Stop
+      Write-Output "OK $($r.StatusCode)"
+    } catch {
+      if ($_.Exception.Response) { Write-Output "OK $([int]$_.Exception.Response.StatusCode)" }
+      else { Write-Output "DOWN" }
+    }
+  `;
+  try {
+    const out = execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 25000,
+    }).trim();
+    if (out.startsWith('OK')) return { reachable: true, url, status: out.split(' ')[1] };
+    return { reachable: false, url, reason: `nothing is answering at ${url}` };
+  } catch {
+    return { reachable: null, url, reason: 'could not run the reachability check' };
+  }
+}
+
 /** Start time of the process listening on `port`, or null if undeterminable. */
 function listenerStartTime(port) {
   if (process.platform !== 'win32') return null;
@@ -105,4 +142,4 @@ function checkAppFreshness(repoRoot, changedFiles) {
   };
 }
 
-module.exports = { checkAppFreshness };
+module.exports = { checkAppFreshness, checkAppReachable };

@@ -8,7 +8,7 @@ const { classify } = require('../src/evidenceStrength');
 const { render } = require('../src/verdict');
 const { checkEnvironment } = require('../src/preflight');
 const { buildReport } = require('../src/report');
-const { checkAppFreshness } = require('../src/staleness');
+const { checkAppFreshness, checkAppReachable } = require('../src/staleness');
 const fs = require('fs');
 
 const HELP = `
@@ -120,6 +120,24 @@ async function main() {
 
   if (testFiles.length === 0) {
     console.log('No live Kane tests resolve for the affected ACs:', unresolved.join(', '));
+    return;
+  }
+
+  // The app has to actually be answering. Verifying against a dead server
+  // produces "test-agent error" on every criterion, which reads like Kane
+  // being unreliable rather than like there being no app -- a diagnosis that
+  // has already cost hours once.
+  const reach = checkAppReachable(repoRoot);
+  if (reach.reachable === false) {
+    console.log('APP NOT RESPONDING -- refusing to verify.\n');
+    console.log(`  ${reach.reason}.`);
+    console.log('\n  Kane would drive a browser at a URL serving nothing, and every');
+    console.log('  criterion would come back as a test-agent error that means nothing.');
+    console.log('\n  Start the app first:');
+    console.log('    cd app && npm run dev');
+    console.log('\n  If it fails with EADDRINUSE, free the port and try again:');
+    console.log('    .\\demo\\free-port.ps1');
+    process.exitCode = 1;
     return;
   }
 
