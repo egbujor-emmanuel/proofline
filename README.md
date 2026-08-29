@@ -78,10 +78,19 @@ kane-cli whoami                 # confirm authenticated
 git clone <this-repo> && cd proofline
 
 # 3. The app under test
-cd app && npm install && npm start     # serves http://localhost:4000
+cd app && npm install && npm run dev   # serves http://localhost:4000
 ```
 
-Leave the app running, then in a second terminal:
+Use `npm run dev`, not `npm start`. It restarts the server whenever the code
+changes. With `npm start` you must restart it by hand after every edit, and
+forgetting once means Kane tests code you are no longer running.
+
+**Leave that terminal open** and confirm <http://localhost:4000> loads in a
+browser before going further. If the app is not answering, Proofline refuses
+to run rather than producing a meaningless result — but everything is
+simpler if you check first.
+
+Then, in a second terminal:
 
 ```bash
 cd proofline-cli
@@ -97,27 +106,83 @@ npm install -g @anthropic-ai/claude-code && claude   # sign in once
 
 Without either, Proofline still runs fully on its deterministic IDF-weighted mapper and says so explicitly rather than faking a score.
 
-## Try it in 30 seconds
+## See it catch a real bug
+
+This is the exact sequence, verified end to end. Run it from
+`proofline-cli`, with the app running in the other terminal.
 
 ```bash
-cd proofline-cli
-
-# Costs nothing, spends no Kane credits: what would this change put at risk?
-node bin/proofline.js --repo .. --dry-run --ref HEAD~1
-
-# Full run: verifies the at-risk ACs with real Kane, writes a shareable report
-node bin/proofline.js --repo .. --ref HEAD~1 --report ../proof-report.html
+# 1. Introduce a real regression: the upgrade endpoint returns success
+#    but stops persisting. The API and the UI both still look correct.
+node ../demo/break.js
 ```
 
-Open `proof-report.html` in any browser — self-contained, works offline.
-
-### Reproduce the regression catch
+Check it in the browser: click **Upgrade to Pro** (says Pro), press **F5**
+— it says **Free**. That is the bug.
 
 ```bash
-git log --oneline | grep -i regression      # find the regression commit
-git show <that-commit>                      # the real 2-line defect
-node bin/proofline.js --repo .. --ref <commit-before-it>
+# 2. Which promises does this put at risk?
+#    ~30s, no browser, no Kane credits spent.
+node bin/proofline.js --repo .. --dry-run
+
+# 3. Verify for real. Kane drives Chrome against the running app. 4-5 min.
+node bin/proofline.js --repo .. --report ../proof-report.html
 ```
+
+Expected — and note **AC-3 stays green**, because a persistence bug does
+not break the "no full page navigation" promise:
+
+```
+AC-1  PRODUCT BUG -- REQUIREMENT BROKEN
+AC-2  PRODUCT BUG -- REQUIREMENT BROKEN
+AC-6  PRODUCT BUG -- REQUIREMENT BROKEN
+AC-3  MACHINE VERIFIED
+VERDICT: BLOCK
+```
+
+```bash
+# 4. Commit the bad change, so the FIX becomes the next change to verify.
+../demo/commit-bug.ps1        # Windows; elsewhere: git commit -am "bad change"
+
+# 5. Fix it, and prove the promise holds again. 2-5 min.
+node ../demo/fix.js
+node bin/proofline.js --repo .. --report ../proof-report.html
+```
+
+`AC-1` returns to **MACHINE VERIFIED**. Open `proof-report.html` in any
+browser — self-contained, works offline.
+
+```bash
+# Put everything back afterwards
+../demo/reset-demo.ps1
+```
+
+**Why the final verdict is REVIEW REQUIRED rather than SHIP:** AC-2, AC-4
+and AC-6 are only *test-linked* — a test claims them but no assertion
+independently targets them. Proofline will not call those proven. That is
+the product's argument, not a failure of the demo.
+
+### If something goes wrong
+
+| Message | Cause | Fix |
+|---|---|---|
+| `APP NOT RESPONDING` | app terminal died | restart `npm run dev` |
+| `EADDRINUSE` | port 4000 already taken | `demo/free-port.ps1` |
+| `STALE APP` | server running older code | restart the app terminal |
+| `No changed files against HEAD` | nothing to analyse | run `demo/break.js` first |
+| `TEST-AGENT ERROR` on everything | usually the app is down | confirm the browser loads |
+
+Restore a known-good state at any time:
+
+```bash
+git reset --hard working-demo
+```
+
+### Guides
+
+- `demo/FULL-GUIDE.md` — what every concept and result label means
+- `demo/PRACTICE.md` — step-by-step walkthrough for a first run
+- `demo/VIDEO-SCRIPT.md` — the 3-minute demo narration
 
 ## Tests
 
