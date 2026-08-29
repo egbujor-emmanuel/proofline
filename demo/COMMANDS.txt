@@ -1,0 +1,78 @@
+PROOFLINE DEMO - COMMANDS TO COPY
+=================================
+Keep this file open in Notepad while recording.
+Copy one line at a time, paste into PowerShell with right-click or Ctrl+V.
+
+
+BEFORE RECORDING
+----------------
+
+Terminal A (start the app, then leave it alone):
+
+cd "C:\Users\Yoma Maroh\proofline\app"
+
+npm run dev
+
+
+Terminal B (where you type during the video):
+
+cd "C:\Users\Yoma Maroh\proofline\proofline-cli"
+
+
+DURING THE VIDEO
+----------------
+
+Step 1 - break it:
+
+node ..\demo\break.js
+
+
+Step 2 - see what's at risk (about 30 seconds):
+
+node bin/proofline.js --repo .. --dry-run
+
+
+Step 3 - verify for real (about 5 minutes):
+
+node bin/proofline.js --repo .. --report ..\proof-report.html
+
+
+Step 4 - commit the bad change:
+
+..\demo\commit-bug.ps1
+
+
+Step 5 - fix it:
+
+node ..\demo\fix.js
+
+
+Step 6 - verify again (about 3 minutes):
+
+node bin/proofline.js --repo .. --report ..\proof-report.html
+
+
+Step 7 - open the report:
+
+start ..\proof-report.html
+
+
+AFTER EACH TAKE
+---------------
+
+..\demo\reset-demo.ps1
+
+
+IF SOMETHING BREAKS
+-------------------
+
+App not responding, or EADDRINUSE:
+
+..\demo\free-port.ps1
+
+Then restart the app in Terminal A.
+
+
+Total mess - go back to the known-good state:
+
+git -C "C:\Users\Yoma Maroh\proofline" reset --hard working-demo
